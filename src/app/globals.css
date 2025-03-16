@@ -1,26 +1,130 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@font-face {
+  font-family: 'Google Sans';
+  src: url('/fonts/googlesans.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@font-face {
+  font-family: 'Product Sans';
+  src: local('Product Sans'), url('/fonts/productsans.woff') format('woff');
+  font-style: normal;
+  font-weight: 400;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    @apply relative !important;
+  }
+  body {
+    @apply antialiased tracking-wide relative bg-base !font-google-sans text-base font-extralight text-fore dark:bg-boxdark-2 !important;
+  }
+
+  * {
+    @apply custom-scrollbar !important;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .line-h {
+    line-height: 1.4;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white py-2 px-4 rounded-lg shadow transition-all duration-200;
+  }
+  
+  .btn-primary:hover {
+    @apply bg-primary/90;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-gray-800 py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-secondary:hover {
+    @apply bg-secondary/80;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-gray-2;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-primary/50 rounded;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  @apply py-3 px-4 text-left text-xs font-medium uppercase text-gray-500 border-b border-stroke;
+}
+
+td {
+  @apply py-3 px-4 border-b border-stroke;
+}
+
+tr:hover {
+  @apply bg-gray-2;
+}
+
+/* Animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Custom file upload input */
+.file-upload {
+  @apply border-2 border-dashed border-stroke p-8 rounded-xl bg-gray-2 text-center cursor-pointer transition-all duration-200;
+}
+
+.file-upload:hover {
+  @apply bg-gray-100;
 }

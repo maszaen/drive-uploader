@@ -9,19 +9,26 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "formidable": "^3.5.2",
+    "framer-motion": "^12.5.0",
+    "googleapis": "^146.0.0",
+    "lucide-react": "^0.481.0",
+    "next": "15.2.2",
+    "next-auth": "^4.24.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "next": "15.2.2"
+    "tailwindcss": "^3.4.1"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@types/formidable": "^3.4.5",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.2.2",
-    "@eslint/eslintrc": "^3"
+    "postcss": "^8.5.3",
+    "typescript": "^5"
   }
 }
