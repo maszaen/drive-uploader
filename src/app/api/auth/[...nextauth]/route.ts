@@ -18,7 +18,7 @@ const authOptions = {
     })
   ],
   session: {
-    strategy: "jwt" as "jwt",
+    strategy: "jwt" as const,
     maxAge: 60 * 60 // 1 jam
   },
   secret: process.env.NEXTAUTH_SECRET

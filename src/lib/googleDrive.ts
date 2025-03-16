@@ -16,6 +16,7 @@ const drive = google.drive({
   auth: oauth2Client
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function uploadFile(file: any, parentFolderId: string) {
   const fileMetadata = {
     name: file.originalFilename,
