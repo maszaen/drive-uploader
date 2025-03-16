@@ -39,8 +39,19 @@ const config: Config = {
         bodydark2: "#8A99AF",
         primary: "#0b57d0",
         secondary: "#f5f8fd", 
-        base: "#f0f4f9", 
-        fore: "#ffffff", 
+        base: {
+          ...colors.base,
+          DEFAULT: "#f0f4f9",
+          1: "#f8fafd",
+          2: "#e9eef6",
+        },
+        fore: {
+          ...colors.fore,
+          DEFAULT: "#ffffff",
+          1: "#c2e7ff",
+          2: "#e7e8eb",
+          3: "#004a77",
+        },
         stroke: "#E2E8F0",
         gray: {
           ...colors.gray,

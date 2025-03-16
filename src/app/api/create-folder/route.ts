@@ -1,15 +1,9 @@
 // app/api/create-folder/route.ts
 import { google } from "googleapis";
 import { NextResponse } from "next/server";
-import { isDescendantOfBase } from "../../../lib/googleDrive";
 
 export async function POST(req: Request) {
   try {
-    const baseFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-    if (!baseFolderId) {
-      return NextResponse.json({ message: "Google Drive folder ID tidak dikonfigurasi" }, { status: 500 });
-    }
-
     const body = await req.json();
     const { folderName, parentFolderId } = body;
 
@@ -17,16 +11,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Nama folder diperlukan" }, { status: 400 });
     }
 
-    // Determine the parent folder ID
-    const targetFolderId = parentFolderId || baseFolderId;
-
-    // Validate that the target folder is a descendant of the base folder
-    if (targetFolderId !== baseFolderId) {
-      const isDescendant = await isDescendantOfBase(targetFolderId, baseFolderId);
-      if (!isDescendant) {
-        return NextResponse.json({ message: "Folder tujuan tidak valid" }, { status: 403 });
-      }
-    }
+    // Jika tidak ada parentFolderId, gunakan "root" (folder utama di Google Drive)
+    const targetFolderId = parentFolderId || "root";
 
     // Initialize Google Drive API
     const oauth2Client = new google.auth.OAuth2(
