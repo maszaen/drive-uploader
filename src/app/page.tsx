@@ -1,78 +1,396 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { AppWindow, ArrowUpRight, ChevronDown, Clock, Database, Filter, FolderPlus, Grid, HelpCircle, Home as HomeIcon, Info, List, Plus, Search, Settings, Share2, Star, Trash2, Upload } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+// Define interfaces for type safety
+interface FileItem {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: string;
+  modifiedTime?: string;
+  starred?: boolean;
+}
+
+interface PreviewContent {
+  id?: string;
+  name?: string;
+  mimeType?: string;
+  webViewLink?: string;
+  previewUrl?: string;
+  thumbnailUrl?: string;
+  textContent?: string;
+}
+
+interface FolderPath {
+  id: string;
+  name: string;
+}
+
+type ModalTypes = "delete" | "move" | "createFolder";
+type ViewModes = "list" | "grid";
+type UploadModes = "file" | "folder";
+type SortByOptions = "name" | "modified" | "size";
+type SortOrderOptions = "asc" | "desc";
+
 export default function HomePage() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const [uploadMode, setUploadMode] = useState("file");
+  const [uploadMode, setUploadMode] = useState<UploadModes>("file");
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadMessage, setUploadMessage] = useState("");
-  const [driveFiles, setDriveFiles] = useState<{ id: string; name: string; mimeType: string; size?: string }[]>([]);
-  const [showDrive, setShowDrive] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadMessage, setUploadMessage] = useState<string>("");
+  const [driveFiles, setDriveFiles] = useState<FileItem[]>([]);
+  const [showDrive, setShowDrive] = useState<boolean>(true); // Set to true initially
+  const [showDropdown, setShowDropdown] = useState<boolean>(false);
+  const [showCreateMenu, setShowCreateMenu] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<ViewModes>("list");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const createMenuRef = useRef<HTMLDivElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
-  const passwordInputRef = useRef<HTMLInputElement>(null);
   
   // State for directory navigation
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState<"delete" | "move" | "createFolder" | "password" | "viewDrive">("delete");
-  const [selectedFile, setSelectedFile] = useState<{ id: string; name: string; mimeType: string } | null>(null);
-  const [newFolderName, setNewFolderName] = useState("");
+  const [folderPath, setFolderPath] = useState<FolderPath[]>([]);
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [modalType, setModalType] = useState<ModalTypes>("delete");
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+  const [newFolderName, setNewFolderName] = useState<string>("");
   const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
-  const [availableFolders, setAvailableFolders] = useState<{ id: string; name: string }[]>([]);
-  const [loadingFiles, setLoadingFiles] = useState(false);
-  const [password, setPassword] = useState("");
-  const [passwordAction, setPasswordAction] = useState<"upload" | "delete" | "move" | "viewDrive">("upload");
-  const [passwordError, setPasswordError] = useState("");
+  const [availableFolders, setAvailableFolders] = useState<FolderPath[]>([]);
+  const [loadingFiles, setLoadingFiles] = useState<boolean>(false);
   
   // Search functionality
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filteredFiles, setFilteredFiles] = useState<typeof driveFiles>([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [filteredFiles, setFilteredFiles] = useState<FileItem[]>([]);
+  const [showSearch, setShowSearch] = useState<boolean>(false);
+  
+  // Selected items for batch operations
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [showSelectAll, setShowSelectAll] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
-  }, [status, router]);
+  // Sorting options
+  const [sortBy, setSortBy] = useState<SortByOptions>("name");
+  const [sortOrder, setSortOrder] = useState<SortOrderOptions>("asc");
 
-  // Filter files based on search query
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredFiles(driveFiles);
+  // Current view state
+  const [currentView, setCurrentView] = useState<string>("myDrive");
+  // Storage quota information
+  const [storageQuota, setStorageQuota] = useState<{
+    limit: number;
+    usage: number;
+    usageInDrive: number;
+    usageInDriveTrash: number;
+  }>({ limit: 0, usage: 0, usageInDrive: 0, usageInDriveTrash: 0 });
+
+  // State untuk file preview
+const [showPreview, setShowPreview] = useState<boolean>(false);
+const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+const [previewLoading, setPreviewLoading] = useState<boolean>(false);
+const [previewError, setPreviewError] = useState<string>("");
+const [previewContent, setPreviewContent] = useState<PreviewContent>({});
+
+// Interface untuk file preview
+interface PreviewSupport {
+  canPreview: boolean;
+  previewType: "image" | "pdf" | "document" | "spreadsheet" | "presentation" | "video" | "audio" | "text" | "code" | "unknown";
+}
+
+  // Function to handle loading recent files
+const handleLoadRecent = async () => {
+  try {
+    setLoadingFiles(true);
+    setSearchQuery(""); // Reset search when changing views
+    setCurrentView("recent");
+    
+    const res = await fetch("/api/recent");
+    
+    if (!res.ok) {
+      const data = await res.json();
+      setUploadMessage(data.message || "Failed to load recent files.");
+      setLoadingFiles(false);
       return;
     }
     
-    const filtered = driveFiles.filter(file => 
-      file.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    setFilteredFiles(filtered);
-  }, [searchQuery, driveFiles]);
+    const data = await res.json();
+    
+    setDriveFiles(data.files || []);
+    setFilteredFiles(data.files || []);
+    setCurrentFolderId(null);
+    setFolderPath(data.folderPath || []);
+    setSelectedItems([]);
+  } catch (error) {
+    console.error("Failed to fetch recent files:", error);
+    setUploadMessage("Failed to fetch recent files. Please try again.");
+  } finally {
+    setLoadingFiles(false);
+  }
+};
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
+// Function to handle loading shared files
+const handleLoadShared = async () => {
+  try {
+    setLoadingFiles(true);
+    setSearchQuery(""); // Reset search when changing views
+    setCurrentView("shared");
+    
+    const res = await fetch("/api/shared");
+    
+    if (!res.ok) {
+      const data = await res.json();
+      setUploadMessage(data.message || "Failed to load shared files.");
+      setLoadingFiles(false);
+      return;
+    }
+    
+    const data = await res.json();
+    
+    setDriveFiles(data.files || []);
+    setFilteredFiles(data.files || []);
+    setCurrentFolderId(null);
+    setFolderPath(data.folderPath || []);
+    setSelectedItems([]);
+  } catch (error) {
+    console.error("Failed to fetch shared files:", error);
+    setUploadMessage("Failed to fetch shared files. Please try again.");
+  } finally {
+    setLoadingFiles(false);
+  }
+};
+
+// Function to handle loading starred files
+const handleLoadStarred = async () => {
+  try {
+    setLoadingFiles(true);
+    setSearchQuery(""); // Reset search when changing views
+    setCurrentView("starred");
+    
+    const res = await fetch("/api/starred");
+    
+    if (!res.ok) {
+      const data = await res.json();
+      setUploadMessage(data.message || "Failed to load starred files.");
+      setLoadingFiles(false);
+      return;
+    }
+    
+    const data = await res.json();
+    
+    setDriveFiles(data.files || []);
+    setFilteredFiles(data.files || []);
+    setCurrentFolderId(null);
+    setFolderPath(data.folderPath || []);
+    setSelectedItems([]);
+  } catch (error) {
+    console.error("Failed to fetch starred files:", error);
+    setUploadMessage("Failed to fetch starred files. Please try again.");
+  } finally {
+    setLoadingFiles(false);
+  }
+};
+
+// Function to handle loading trash
+const handleLoadTrash = async () => {
+  try {
+    setLoadingFiles(true);
+    setSearchQuery(""); // Reset search when changing views
+    setCurrentView("trash");
+    
+    const res = await fetch("/api/trash");
+    
+    if (!res.ok) {
+      const data = await res.json();
+      setUploadMessage(data.message || "Failed to load trash.");
+      setLoadingFiles(false);
+      return;
+    }
+    
+    const data = await res.json();
+    
+    setDriveFiles(data.files || []);
+    setFilteredFiles(data.files || []);
+    setCurrentFolderId(null);
+    setFolderPath(data.folderPath || []);
+    setSelectedItems([]);
+  } catch (error) {
+    console.error("Failed to fetch trash:", error);
+    setUploadMessage("Failed to fetch trash. Please try again.");
+  } finally {
+    setLoadingFiles(false);
+  }
+};
+
+// Function to handle loading storage quota
+const handleLoadStorage = async () => {
+  try {
+    setLoadingFiles(true);
+    setSearchQuery(""); // Reset search when changing views
+    setCurrentView("storage");
+    
+    const res = await fetch("/api/storage");
+    
+    if (!res.ok) {
+      const data = await res.json();
+      setUploadMessage(data.message || "Failed to load storage information.");
+      setLoadingFiles(false);
+      return;
+    }
+    
+    const data = await res.json();
+    
+    // Set storage quota information
+    setStorageQuota(data.quota || { 
+      limit: 0, 
+      usage: 0, 
+      usageInDrive: 0, 
+      usageInDriveTrash: 0 
+    });
+    
+    // Clear file list for storage view
+    setDriveFiles([]);
+    setFilteredFiles([]);
+    setCurrentFolderId(null);
+    setFolderPath([{ id: 'storage', name: "Storage" }]);
+    setSelectedItems([]);
+  } catch (error) {
+    console.error("Failed to fetch storage information:", error);
+    setUploadMessage("Failed to fetch storage information. Please try again.");
+  } finally {
+    setLoadingFiles(false);
+  }
+};
+
+// Function to toggle star status
+const handleToggleStar = async (fileId: string, starred: boolean) => {
+  try {
+    const res = await fetch("/api/starred", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fileId, starred }),
+    });
+    
+    const data = await res.json();
+    
+    if (res.ok) {
+      setUploadMessage(data.message || "Star status updated");
+      
+      // Refresh current view
+      if (currentView === "starred") {
+        handleLoadStarred();
+      } else if (currentView === "myDrive") {
+        handleListDrive(currentFolderId);
+      } else if (currentView === "recent") {
+        handleLoadRecent();
       }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+    } else {
+      setUploadMessage(data.message || "Failed to update star status");
+    }
+  } catch (error) {
+    console.error("Failed to toggle star:", error);
+    setUploadMessage("Failed to update star status. Please try again.");
+  }
+};
 
-  // Focus the new folder input when modal opens
+// Function to restore from trash
+const handleRestoreFromTrash = async (fileId: string) => {
+  try {
+    setLoadingFiles(true);
+    
+    const res = await fetch("/api/trash", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fileId, action: "restore" }),
+    });
+    
+    const data = await res.json();
+    
+    if (res.ok) {
+      setUploadMessage(data.message || "File restored from trash");
+      handleLoadTrash(); // Refresh trash view
+    } else {
+      setUploadMessage(data.message || "Failed to restore file");
+    }
+  } catch (error) {
+    console.error("Failed to restore from trash:", error);
+    setUploadMessage("Failed to restore file. Please try again.");
+  } finally {
+    setLoadingFiles(false);
+  }
+};
+
+// Function to empty trash
+const handleEmptyTrash = async () => {
+  try {
+    setLoadingFiles(true);
+    
+    const res = await fetch("/api/trash", {
+      method: "DELETE",
+    });
+    
+    const data = await res.json();
+    
+    if (res.ok) {
+      setUploadMessage(data.message || "Trash emptied successfully");
+      handleLoadTrash(); // Refresh trash view
+    } else {
+      setUploadMessage(data.message || "Failed to empty trash");
+    }
+  } catch (error) {
+    console.error("Failed to empty trash:", error);
+    setUploadMessage("Failed to empty trash. Please try again.");
+  } finally {
+    setLoadingFiles(false);
+  }
+};
+
+// Function to move file to trash
+const handleMoveToTrash = async (fileId: string) => {
+  try {
+    setLoadingFiles(true);
+    
+    const res = await fetch("/api/trash", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fileId, action: "trash" }),
+    });
+    
+    const data = await res.json();
+    
+    if (res.ok) {
+      setUploadMessage(data.message || "File moved to trash");
+      
+      // Refresh current view
+      if (currentView === "myDrive") {
+        handleListDrive(currentFolderId);
+      } else if (currentView === "starred") {
+        handleLoadStarred();
+      } else if (currentView === "recent") {
+        handleLoadRecent();
+      }
+    } else {
+      setUploadMessage(data.message || "Failed to move file to trash");
+    }
+  } catch (error) {
+    console.error("Failed to move to trash:", error);
+    setUploadMessage("Failed to move file to trash. Please try again.");
+  } finally {
+    setLoadingFiles(false);
+  }
+};
+
   useEffect(() => {
     if (showModal && modalType === "createFolder" && newFolderInputRef.current) {
       // Use a small timeout to ensure the modal is rendered before focusing
@@ -83,49 +401,150 @@ export default function HomePage() {
       }, 50);
     }
   }, [showModal, modalType]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedFiles(e.target.files);
-    setUploadMessage("");
-  };
-
-  const triggerFileInput = () => {
-    if (uploadMode === "file" && fileInputRef.current) {
-      fileInputRef.current.click();
-    } else if (uploadMode === "folder" && folderInputRef.current) {
-      folderInputRef.current.click();
+  
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    } else if (status === "authenticated") {
+      // Load files immediately after authentication
+      handleListDrive(null);
     }
-  };
+  }, [status, router]);
 
-  const handleUpload = async () => {
-    if (!selectedFiles || selectedFiles.length === 0) {
-      setUploadMessage("Please select a file or folder first");
-      return;
-    }
+  useEffect(() => {
+  if (status === "authenticated") {
+    fetch("/api/storage")
+      .then(res => res.json())
+      .then(data => {
+        if (data.quota) {
+          setStorageQuota(data.quota);
+        }
+      })
+      .catch(error => {
+        console.error("Failed to fetch storage quota:", error);
+      });
+  }
+}, [status]);
+
+  // Filter and sort files when search query or drive files change
+  useEffect(() => {
+    const filtered = !searchQuery.trim() 
+      ? [...driveFiles]
+      : driveFiles.filter(file => 
+          file.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
     
-    // Request password confirmation before upload
-    setPasswordAction("upload");
-    setPassword("");
-    setPasswordError("");
-    setModalType("password");
-    setShowModal(true);
+    // Apply current sorting to filtered results
+    setFilteredFiles(getSortedFiles(filtered));
+  }, [searchQuery, driveFiles]);
+
+  // Function to sort files (not in useEffect to avoid infinite loop)
+  const getSortedFiles = (files: FileItem[]) => {
+    return [...files].sort((a, b) => {
+      let comparison = 0;
+      
+      // Sort by type first (folders first)
+      const aIsFolder = a.mimeType && a.mimeType.includes('folder');
+      const bIsFolder = b.mimeType && b.mimeType.includes('folder');
+      
+      if (aIsFolder && !bIsFolder) return -1;
+      if (!aIsFolder && bIsFolder) return 1;
+      
+      // Then sort by selected field
+      if (sortBy === "name") {
+        comparison = a.name.localeCompare(b.name);
+      } else if (sortBy === "modified") {
+        // Assuming there's a lastModified property
+        const aDate = a.modifiedTime ? new Date(a.modifiedTime) : new Date(0);
+        const bDate = b.modifiedTime ? new Date(b.modifiedTime) : new Date(0);
+        comparison = aDate.getTime() - bDate.getTime();
+      } else if (sortBy === "size") {
+        const aSize = a.size ? parseInt(a.size) : 0;
+        const bSize = b.size ? parseInt(b.size) : 0;
+        comparison = aSize - bSize;
+      }
+      
+      // Apply sort order
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
   };
   
-  const executeUpload = async () => {
-    setShowModal(false);
+  // Apply sorting when sortBy or sortOrder changes
+  useEffect(() => {
+    setFilteredFiles(getSortedFiles(driveFiles));
+  }, [sortBy, sortOrder, driveFiles]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+      if (createMenuRef.current && !createMenuRef.current.contains(event.target as Node)) {
+        setShowCreateMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("File selection changed", e.target.files);
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFiles(e.target.files);
+      setUploadMessage("");
+      
+      // Set upload mode based on input ID
+      if (e.target.id === 'folder-upload') {
+        setUploadMode("folder");
+      } else {
+        setUploadMode("file");
+      }
+      
+      // Auto start upload when files are selected
+      console.log("Auto starting upload");
+      executeUpload(e.target.files);
+    }
+  };
+  
+  const executeUpload = async (files: FileList) => {
+    console.log("Execute upload", files);
+    if (!files || files.length === 0) {
+      console.log("No files to upload");
+      return;
+    }
+
+    // Calculate total size
+    let totalSize = 0;
+    for (let i = 0; i < files.length; i++) {
+      totalSize += files[i].size;
+    }
+    
+    setTotalUploadSize(totalSize);
+    setTotalFiles(files.length);
+    setUploadedFiles(0);
+    setUploadedSize(0);
+    setShowUploadStatus(true);
+    
     setUploading(true);
     setUploadProgress(0);
     setUploadMessage("");
 
     const formData = new FormData();
-    for (let i = 0; i < selectedFiles!.length; i++) {
-      formData.append("files", selectedFiles![i]);
-      if (uploadMode === "folder") {
-        formData.append("relativePaths", selectedFiles![i].webkitRelativePath || "");
+    for (let i = 0; i < files.length; i++) {
+      formData.append("files", files[i]);
+      
+      // Check if it's a folder upload by looking at the webkitRelativePath property
+      const file = files[i] as any;
+      if (file.webkitRelativePath) {
+        console.log("Folder upload detected, relativePath:", file.webkitRelativePath);
+        formData.append("relativePaths", file.webkitRelativePath || "");
       }
     }
+    
     formData.append("uploadMode", uploadMode);
-    formData.append("password", password);
     
     // Add currentFolderId to formData if available
     if (currentFolderId) {
@@ -133,85 +552,217 @@ export default function HomePage() {
     }
 
     try {
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
+      console.log("Starting upload simulation");
+      // For demo purposes, we'll simulate upload progress
+      const simulateUploadProgress = () => {
+        let currentProgress = 0;
+        const interval = setInterval(() => {
+          if (currentProgress >= 100) {
+            clearInterval(interval);
+            return;
           }
-          return prev + (90 - prev) / 10;
-        });
-      }, 500);
+          
+          currentProgress += Math.random() * 5;
+          if (currentProgress > 100) currentProgress = 100;
+          
+          setUploadProgress(currentProgress);
+          setUploadedSize(totalSize * (currentProgress / 100));
+          
+          // Randomly update current file
+          if (files && currentProgress % 20 < 1 && uploadedFiles < totalFiles) {
+            const nextFileIndex = uploadedFiles;
+            if (files[nextFileIndex]) {
+              setCurrentUploadFile(files[nextFileIndex].name);
+              setUploadedFiles(prev => Math.min(prev + 1, files.length));
+            }
+          }
+          
+        }, 300);
+        return interval;
+      };
 
+      const progressInterval = simulateUploadProgress();
+
+      console.log("Sending request to /api/upload");
       const res = await fetch("/api/upload", {
         method: "POST",
         body: formData
       });
       
+      console.log("Upload response received", res.status);
       clearInterval(progressInterval);
       setUploadProgress(100);
+      setUploadedSize(totalSize);
+      setUploadedFiles(totalFiles);
       
       const data = await res.json();
       
       if (!res.ok) {
-        setUploadMessage(data.message || "Upload failed. Invalid password.");
+        console.log("Upload failed", data);
+        setUploadMessage(data.message || "Upload failed.");
       } else {
+        console.log("Upload successful", data);
         setUploadMessage(data.message || "Upload successful");
         
         if (fileInputRef.current) fileInputRef.current.value = "";
         if (folderInputRef.current) folderInputRef.current.value = "";
-        setSelectedFiles(null);
         
-        if (showDrive) {
-          handleListDrive(currentFolderId);
-        }
+        // Refresh file list
+        handleListDrive(currentFolderId);
+        
+        // Keep upload status visible for a moment so user can see it completed
+        setTimeout(() => {
+          setShowUploadStatus(false);
+          setSelectedFiles(null);
+        }, 1500);
       }
     } catch (error) {
-      setUploadMessage("Upload failed. Please try again.");
       console.error("Upload error:", error);
+      setUploadMessage("Upload failed. Please try again.");
     } finally {
-      setUploading(false);
-      setTimeout(() => setUploadProgress(0), 1000);
+      // Leave upload status visible a bit longer even after upload completes
+      setTimeout(() => {
+        setUploading(false);
+        if (!showUploadStatus) setUploadProgress(0);
+      }, 1000);
     }
   };
 
-  // Modified to support directory navigation with password
-  const handleListDrive = async (folderId: string | null = null) => {
-  if (!showDrive) {
-    // First time viewing drive - request password
-    setPasswordAction("viewDrive");
-    setPassword("");
-    setPasswordError("");
-    setModalType("viewDrive");
-    setShowModal(true);
+  console.log("Debug fileInputRef:", fileInputRef?.current);
+  console.log("Debug folderInputRef:", folderInputRef?.current);
+  
+  const triggerFileInput = (mode: UploadModes) => {
+    console.log("Triggering file input", mode);
+    if (mode === "file" && fileInputRef.current) {
+      console.log("Clicking file input");
+      fileInputRef.current.click();
+    } else if (mode === "folder" && folderInputRef.current) {
+      console.log("Clicking folder input with webkitDirectory attribute");
+      folderInputRef.current.click();
+    }
+  };
+
+  // Fungsi untuk menentukan apakah file dapat di-preview dan tipe previewnya
+const getPreviewSupport = (file: FileItem): PreviewSupport => {
+  const mimeType = file.mimeType || "";
+  
+  // File Google bisa di-preview
+  if (mimeType.includes('google-apps')) {
+    if (mimeType.includes('document')) {
+      return { canPreview: true, previewType: "document" };
+    } else if (mimeType.includes('spreadsheet')) {
+      return { canPreview: true, previewType: "spreadsheet" };
+    } else if (mimeType.includes('presentation')) {
+      return { canPreview: true, previewType: "presentation" };
+    } else if (mimeType.includes('drawing')) {
+      return { canPreview: true, previewType: "image" };
+    }
+  }
+  
+  // File lainnya
+  if (mimeType.includes('image')) {
+    return { canPreview: true, previewType: "image" };
+  } else if (mimeType.includes('pdf')) {
+    return { canPreview: true, previewType: "pdf" };
+  } else if (mimeType.includes('video')) {
+    return { canPreview: true, previewType: "video" };
+  } else if (mimeType.includes('audio')) {
+    return { canPreview: true, previewType: "audio" };
+  } else if (mimeType.includes('text') || mimeType.includes('javascript') || mimeType.includes('json') || mimeType.includes('css') || mimeType.includes('html')) {
+    return { canPreview: true, previewType: "text" };
+  } else if (mimeType.includes('msword') || mimeType.includes('officedocument.wordprocessingml')) {
+    return { canPreview: true, previewType: "document" };
+  } else if (mimeType.includes('excel') || mimeType.includes('officedocument.spreadsheetml')) {
+    return { canPreview: true, previewType: "spreadsheet" };
+  } else if (mimeType.includes('powerpoint') || mimeType.includes('officedocument.presentationml')) {
+    return { canPreview: true, previewType: "presentation" };
+  }
+  
+  // Folder dan file yang tidak dapat di-preview
+  if (mimeType.includes('folder')) {
+    return { canPreview: false, previewType: "unknown" };
+  }
+  
+  // Default: tidak dapat di-preview
+  return { canPreview: false, previewType: "unknown" };
+};
+
+// Fungsi untuk menangani klik pada file
+const handleFileAction = async (file: FileItem) => {
+  // Jika folder, navigasi ke folder tersebut
+  if (file.mimeType.includes('folder')) {
+    navigateToFolder(file.id);
     return;
   }
   
+  // Untuk file non-folder, dapatkan link dari API dan arahkan ke Google Drive/Docs
   try {
     setLoadingFiles(true);
-    setSearchQuery(""); // Reset search when navigating
-    
-    const queryParams = new URLSearchParams();
-    if (folderId) {
-      queryParams.append('folderId', folderId);
-    }
-    queryParams.append('password', password);
-    
-    const res = await fetch(`/api/list?${queryParams.toString()}`);
+    const res = await fetch(`/api/filelink?fileId=${file.id}`);
     
     if (!res.ok) {
-      const data = await res.json();
-      setUploadMessage(data.message || "Failed to load files. Invalid password.");
+      const error = await res.json();
+      setUploadMessage(error.message || "Failed to get file link");
       setLoadingFiles(false);
       return;
     }
     
     const data = await res.json();
     
+    // Buka URL dalam tab baru
+    if (data.fileUrl) {
+      window.open(data.fileUrl, '_blank');
+    } else {
+      setUploadMessage("Couldn't open file. Please try again.");
+    }
+  } catch (error) {
+    console.error("Error opening file:", error);
+    setUploadMessage("Failed to open file. Please try again.");
+  } finally {
+    setLoadingFiles(false);
+  }
+};
+  
+  const [currentUploadFile, setCurrentUploadFile] = useState<string>("");
+  const [totalUploadSize, setTotalUploadSize] = useState<number>(0);
+  const [uploadedSize, setUploadedSize] = useState<number>(0);
+  const [uploadedFiles, setUploadedFiles] = useState<number>(0);
+  const [totalFiles, setTotalFiles] = useState<number>(0);
+  const [showUploadStatus, setShowUploadStatus] = useState<boolean>(false);
+
+  // Modified to remove password requirement
+  const handleListDrive = async (folderId: string | null = null) => {
+  try {
+    setLoadingFiles(true);
+    setSearchQuery(""); // Reset search when navigating
+    setCurrentView("myDrive"); // Set current view to My Drive
+    
+    const queryParams = new URLSearchParams();
+    if (folderId) {
+      queryParams.append('folderId', folderId);
+    }
+    
+    const res = await fetch(`/api/list?${queryParams.toString()}`);
+    
+    if (!res.ok) {
+      const data = await res.json();
+      setUploadMessage(data.message || "Failed to load files.");
+      setLoadingFiles(false);
+      return;
+    }
+    
+    const data = await res.json();
+    
+    // Set showDrive to true if not already set
+    if (!showDrive) {
+      setShowDrive(true);
+    }
+    
     setDriveFiles(data.files || []);
     setFilteredFiles(data.files || []);
     setCurrentFolderId(data.currentFolder?.id || null);
     setFolderPath(data.folderPath || []);
+    setSelectedItems([]);
   } catch (error) {
     console.error("Failed to fetch files:", error);
     setUploadMessage("Failed to fetch files. Please try again.");
@@ -226,50 +777,78 @@ export default function HomePage() {
   };
 
   // Function to handle file/folder deletion
-  const handleDelete = async (fileId: string, name: string, mimeType: string) => {
+  const handleDelete = (fileId: string, name: string, mimeType: string) => {
     setSelectedFile({ id: fileId, name, mimeType });
     setModalType("delete");
     setShowModal(true);
   };
 
-  // Function to confirm deletion
+  // Function to confirm deletion - Modified to remove password
   const confirmDelete = async () => {
     if (!selectedFile) return;
     
-    // Request password confirmation before deletion
-    setPasswordAction("delete");
-    setPassword("");
-    setPasswordError("");
-    setModalType("password");
-    setShowModal(true);
+    setShowModal(false);
+    executeDelete();
   };
   
-  // Execute deletion after password confirmation
+  // Execute deletion - Modified to remove password
   const executeDelete = async () => {
     if (!selectedFile) return;
     
-    setShowModal(false);
     try {
       setLoadingFiles(true);
-      const res = await fetch("/api/delete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ 
-          fileId: selectedFile.id,
-          password: password
-        }),
-      });
       
-      const data = await res.json();
-      if (res.ok) {
-        setUploadMessage(data.message || "Item successfully deleted");
-        // Refresh file list
-        handleListDrive(currentFolderId);
+      // Check if it's a bulk delete (comma-separated IDs)
+      const isMultipleDelete = selectedFile.id.includes(',');
+      
+      // For bulk delete, let's process one by one to avoid issues
+      if (isMultipleDelete) {
+        const fileIds = selectedFile.id.split(',');
+        let successCount = 0;
+        
+        for (const fileId of fileIds) {
+          try {
+            const res = await fetch("/api/delete", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ fileId }),
+            });
+            
+            if (res.ok) {
+              successCount++;
+            }
+          } catch (error) {
+            console.error(`Error deleting file ${fileId}:`, error);
+          }
+        }
+        
+        if (successCount > 0) {
+          setUploadMessage(`Successfully deleted ${successCount} of ${fileIds.length} items`);
+        } else {
+          setUploadMessage("Failed to delete items");
+        }
       } else {
-        setUploadMessage(data.message || "Failed to delete item");
+        // Single file delete
+        const res = await fetch("/api/delete", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ fileId: selectedFile.id }),
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+          setUploadMessage(data.message || "Item successfully deleted");
+        } else {
+          setUploadMessage(data.message || "Failed to delete item");
+        }
       }
+      
+      // Refresh file list
+      handleListDrive(currentFolderId);
     } catch (error) {
       console.error("Delete error:", error);
       setUploadMessage("Failed to delete item");
@@ -289,12 +868,12 @@ export default function HomePage() {
       const res = await fetch("/api/list");
       const data = await res.json();
       // Filter to only include folders
-      const folders = data.files.filter((file: any) => 
-        file.mimeType.includes('folder')
-      ).map((folder: any) => ({
+      const folders = data.files?.filter((file: any) => 
+        file.mimeType?.includes('folder')
+      )?.map((folder: any) => ({
         id: folder.id,
         name: folder.name
-      }));
+      })) || [];
       
       setAvailableFolders(folders);
       setShowModal(true);
@@ -303,23 +882,18 @@ export default function HomePage() {
     }
   };
 
-  // Function to confirm move
+  // Function to confirm move - Modified to remove password
   const confirmMove = async () => {
     if (!selectedFile || !targetFolderId) return;
     
-    // Request password confirmation before move
-    setPasswordAction("move");
-    setPassword("");
-    setPasswordError("");
-    setModalType("password");
-    setShowModal(true);
+    setShowModal(false);
+    executeMove();
   };
   
-  // Execute move after password confirmation
+  // Execute move - Modified to remove password
   const executeMove = async () => {
     if (!selectedFile || !targetFolderId) return;
     
-    setShowModal(false);
     try {
       setLoadingFiles(true);
       const res = await fetch("/api/move", {
@@ -329,8 +903,7 @@ export default function HomePage() {
         },
         body: JSON.stringify({ 
           fileId: selectedFile.id,
-          destinationFolderId: targetFolderId,
-          password: password
+          destinationFolderId: targetFolderId
         }),
       });
       
@@ -357,6 +930,7 @@ export default function HomePage() {
     setModalType("createFolder");
     setNewFolderName("");
     setShowModal(true);
+    setShowCreateMenu(false);
   };
 
   // Function to confirm folder creation
@@ -393,82 +967,27 @@ export default function HomePage() {
       setLoadingFiles(false);
     }
   };
-  
-  
-  const executeViewDrive = async () => {
-  try {
-    setLoadingFiles(true);
-    
-    const queryParams = new URLSearchParams();
-    queryParams.append('password', password);
-    
-    const res = await fetch(`/api/list?${queryParams.toString()}`);
-    
-    if (!res.ok) {
-      const data = await res.json();
-      setUploadMessage(data.message || "Failed to load files. Invalid password.");
-      setLoadingFiles(false);
-      return;
-    }
-    
-    const data = await res.json();
-    
-    // Set showDrive to true BEFORE updating the other states
-    setShowDrive(true);
-    setDriveFiles(data.files || []);
-    setFilteredFiles(data.files || []);
-    setCurrentFolderId(data.currentFolder?.id || null);
-    setFolderPath(data.folderPath || []);
-  } catch (error) {
-    console.error("Failed to fetch files:", error);
-    setUploadMessage("Failed to fetch files. Please try again.");
-  } finally {
-    setLoadingFiles(false);
-  }
-};
-
-  const handlePasswordSubmit = () => {
-  if (!password.trim()) {
-    setPasswordError("Password is required");
-    return;
-  }
-  
-  // Execute the appropriate action based on passwordAction
-  switch (passwordAction) {
-    case "upload":
-      executeUpload();
-      break;
-    case "delete":
-      executeDelete();
-      break;
-    case "move":
-      executeMove();
-      break;
-    case "viewDrive":
-      setShowModal(false);
-      executeViewDrive();  // Use a separate function instead of calling handleListDrive directly
-      break;
-  }
-};
 
   const handleLogout = async () => {
     localStorage.clear();
     sessionStorage.clear();
     
-    // Hapus semua cookies
+    // Delete all cookies
     document.cookie.split(";").forEach((c) => {
       document.cookie = c
         .replace(/^ +/, "")
         .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
     });
 
-    // Hapus indexedDB databases jika diperlukan
+    // Delete indexedDB databases if needed
     const databases = await window.indexedDB?.databases();
-    databases?.forEach((db) => {
-      if (db.name) window.indexedDB.deleteDatabase(db.name);
-    });
+    if (databases) {
+      databases.forEach((db) => {
+        if (db.name) window.indexedDB.deleteDatabase(db.name);
+      });
+    }
 
-    // Hapus service workers dan cache
+    // Delete service workers and cache
     if (navigator.serviceWorker) {
       const registrations = await navigator.serviceWorker.getRegistrations();
       registrations.forEach((registration) => registration.unregister());
@@ -477,7 +996,7 @@ export default function HomePage() {
       });
     }
 
-    // Logout dari sesi NextAuth
+    // Logout from NextAuth session
     await signOut({ redirect: false });
     router.push("/login");
   };
@@ -502,45 +1021,190 @@ export default function HomePage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // Breadcrumb component for folder navigation
-  const BreadcrumbNav = () => {
-    if (!folderPath || folderPath.length === 0) return null;
-    
-    return (
-      <nav className="flex mb-5 text-sm overflow-x-auto py-1">
-        <ol className="flex items-center space-x-1">
-          {folderPath.map((folder, index) => (
-            <li key={folder.id} className="flex items-center whitespace-nowrap">
-              {index > 0 && <span className="mx-1 text-gray-300">/</span>}
-              <button
-                onClick={() => navigateToFolder(folder.id)}
-                className={`hover:text-blue-500 transition-colors ${
-                  index === folderPath.length - 1
-                    ? "font-medium text-blue-500"
-                    : "text-gray-500"
-                }`}
-              >
-                {folder.name}
-              </button>
-            </li>
-          ))}
-        </ol>
-      </nav>
-    );
+  // Handle item selection for batch operations
+  const toggleItemSelection = (fileId: string) => {
+    setSelectedItems(prev => {
+      if (prev.includes(fileId)) {
+        return prev.filter(id => id !== fileId);
+      } else {
+        return [...prev, fileId];
+      }
+    });
   };
+
+  // Handle select all functionality
+  const toggleSelectAll = () => {
+    if (selectedItems.length === filteredFiles.length) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems(filteredFiles.map(file => file.id));
+    }
+  };
+
+  // Batch delete selected items
+  const batchDeleteSelected = () => {
+    if (selectedItems.length === 0) return;
+    
+    setSelectedFile({ 
+      id: selectedItems.join(','), 
+      name: `${selectedItems.length} items`, 
+      mimeType: 'batch'
+    });
+    setModalType("delete");
+    setShowModal(true);
+  };
+
+  // Modal untuk preview file
+// Modal untuk preview file
+const PreviewModal = () => {
+  if (!showPreview || !previewFile) return null;
+  
+  const previewInfo = getPreviewSupport(previewFile);
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm z-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white shadow-sm p-4 flex items-center justify-between">
+        <div className="flex items-center">
+          <span className="text-xl mr-3">{getFileIcon(previewFile.mimeType)}</span>
+          <div>
+            <h3 className="text-lg font-medium">{previewFile.name}</h3>
+            <p className="text-sm text-gray-500">
+              {previewFile.size ? formatFileSize(parseInt(previewFile.size)) : ''}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-4">
+          {previewContent?.webViewLink && (
+            <a 
+              href={previewContent.webViewLink} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm px-4 py-2 text-[#1a73e8] hover:bg-[#e8f0fe] rounded-md transition-colors"
+            >
+              Open with Google
+            </a>
+          )}
+          <button
+            onClick={() => setShowPreview(false)}
+            className="text-gray-500 hover:bg-gray-100 p-2 rounded-full"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      
+      {/* Preview Content */}
+      <div className="flex-grow overflow-auto bg-gray-100 flex items-center justify-center p-4">
+        {previewLoading ? (
+          <div className="text-center">
+            <motion.div 
+              className="w-10 h-10 border-4 border-gray-200 border-t-[#1a73e8] rounded-full mx-auto mb-4"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            />
+            <p className="text-gray-500">Loading preview...</p>
+          </div>
+        ) : previewError ? (
+          <div className="bg-white p-6 rounded-lg shadow-md text-center">
+            <svg className="w-12 h-12 text-red-500 mx-auto mb-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 4.5C7 4.5 2.73 7.61 1 12C2.73 16.39 7 19.5 12 19.5C17 19.5 21.27 16.39 23 12C21.27 7.61 17 4.5 12 4.5ZM12 17C9.24 17 7 14.76 7 12C7 9.24 9.24 7 12 7C14.76 7 17 9.24 17 12C17 14.76 14.76 17 12 17ZM12 9C10.34 9 9 10.34 9 12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12C15 10.34 13.66 9 12 9Z" fill="currentColor"/>
+              <path d="M1.41 1.13L0 2.54L4.4 6.94C3.1 8.42 2.13 10.14 1.61 12.03C3.08 16.62 7.17 19.88 12 19.88C13.88 19.88 15.69 19.38 17.3 18.45L20.55 21.7L21.96 20.29L1.41 1.13ZM12 17.5C9.24 17.5 7 15.26 7 12.5C7 11.47 7.32 10.53 7.85 9.74L10.61 12.5C10.58 12.6 10.55 12.7 10.55 12.79C10.55 13.8 11.34 14.62 12.35 14.62C12.46 14.62 12.56 14.6 12.66 14.57L15.37 17.28C14.39 17.34 13.12 17.5 12 17.5ZM8.89 7.5L6.7 5.31C8.31 4.27 10.08 3.74 12 3.74C16.85 3.74 20.94 7 22.39 11.59C22.11 12.41 21.74 13.18 21.32 13.88L18.2 10.76C18.35 10.39 18.44 9.95 18.44 9.5C18.44 6.74 16.2 4.5 13.44 4.5C12.28 4.5 11.22 4.9 10.35 5.56L9.89 5.1C9.65 5.31 9.07 6.4 8.89 7.5Z" fill="currentColor"/>
+            </svg>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Preview Not Available</h3>
+            <p className="text-gray-500">{previewError}</p>
+            <button
+              onClick={() => setShowPreview(false)}
+              className="mt-4 px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-sm font-medium"
+            >
+              Close
+            </button>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-md max-w-full max-h-full overflow-auto">
+            {previewInfo.previewType === "image" && previewContent?.previewUrl && (
+              <img 
+                src={previewContent.previewUrl} 
+                alt={previewFile.name}
+                className="max-w-full max-h-[80vh] object-contain"
+              />
+            )}
+            
+            {previewInfo.previewType === "pdf" && previewFile?.id && (
+              <iframe 
+                src={`https://drive.google.com/file/d/${previewFile.id}/preview`}
+                className="w-full h-[80vh]"
+                allowFullScreen
+              ></iframe>
+            )}
+            
+            {(previewInfo.previewType === "document" || previewInfo.previewType === "spreadsheet" || previewInfo.previewType === "presentation") && previewContent?.webViewLink && (
+              <iframe 
+                src={previewContent.webViewLink}
+                className="w-full h-[80vh]"
+                allowFullScreen
+              ></iframe>
+            )}
+            
+            {previewInfo.previewType === "video" && previewFile?.id && (
+              <div className="p-4 text-center">
+                <a 
+                  href={`https://drive.google.com/file/d/${previewFile.id}/view`}
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-sm font-medium inline-block"
+                >
+                  Open Video
+                </a>
+                <p className="text-sm text-gray-500 mt-2">Video preview is not available directly. Click above to open.</p>
+              </div>
+            )}
+            
+            {previewInfo.previewType === "text" && previewContent?.textContent && (
+              <pre className="p-4 overflow-auto max-h-[80vh] max-w-[80vw] whitespace-pre-wrap">
+                {previewContent.textContent}
+              </pre>
+            )}
+            
+            {(!previewContent?.previewUrl && !previewContent?.textContent && !previewContent?.thumbnailUrl) && (
+              <div className="p-8 text-center">
+                <p className="text-gray-500">Preview not available for this file type.</p>
+                {previewFile?.id && (
+                  <a 
+                    href={`https://drive.google.com/file/d/${previewFile.id}/view`}
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="mt-4 px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-sm font-medium inline-block"
+                  >
+                    Open in Google Drive
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
   // Modal component for confirmation dialogs
   const Modal = () => {
     if (!showModal) return null;
     
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm z-50 flex items-center justify-center">
         <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-          {modalType === "delete" && (
+          {modalType === "delete" && selectedFile && (
             <>
               <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
               <p className="text-gray-700 mb-6">
-                Are you sure you want to delete "{selectedFile?.name}"?
+                Are you sure you want to delete "{selectedFile.name}"?
+                {selectedFile.mimeType === 'batch' && (
+                  <span className="block mt-2 text-sm text-red-500">This action cannot be undone.</span>
+                )}
               </p>
               <div className="flex justify-end space-x-3">
                 <button
@@ -559,9 +1223,9 @@ export default function HomePage() {
             </>
           )}
           
-          {modalType === "move" && (
+          {modalType === "move" && selectedFile && (
             <>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Move "{selectedFile?.name}"</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Move "{selectedFile.name}"</h3>
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Select Destination Folder
@@ -639,94 +1303,6 @@ export default function HomePage() {
               </div>
             </>
           )}
-          
-          {modalType === "viewDrive" && (
-            <>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                View Google Drive Files
-              </h3>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Enter admin password to access files
-                </label>
-                <input
-                  type="password"
-                  ref={passwordInputRef}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Password"
-                  autoFocus
-                />
-                {passwordError && (
-                  <p className="mt-1 text-sm text-red-500">{passwordError}</p>
-                )}
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium rounded-md transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handlePasswordSubmit}
-                  disabled={!password}
-                  className={`px-4 py-2 ${
-                    !password
-                      ? "bg-blue-300 cursor-not-allowed"
-                      : "bg-blue-500 hover:bg-blue-600"
-                  } text-white text-sm font-medium rounded-md transition-colors`}
-                >
-                  View Files
-                </button>
-              </div>
-            </>
-          )}
-
-          {modalType === "password" && (
-            <>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Password Required
-              </h3>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Enter admin password to proceed
-                </label>
-                <input
-                  type="password"
-                  ref={passwordInputRef}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Password"
-                  autoFocus
-                />
-                {passwordError && (
-                  <p className="mt-1 text-sm text-red-500">{passwordError}</p>
-                )}
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium rounded-md transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handlePasswordSubmit}
-                  disabled={!password}
-                  className={`px-4 py-2 ${
-                    !password
-                      ? "bg-blue-300 cursor-not-allowed"
-                      : "bg-blue-500 hover:bg-blue-600"
-                  } text-white text-sm font-medium rounded-md transition-colors`}
-                >
-                  Submit
-                </button>
-              </div>
-            </>
-          )}
         </div>
       </div>
     );
@@ -734,7 +1310,7 @@ export default function HomePage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f5f5f7]">
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
         <motion.div 
           className="w-10 h-10 border-4 border-gray-300 border-t-blue-500 rounded-full"
           animate={{ rotate: 360 }}
@@ -745,417 +1321,812 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f5f5f7] font-sans">
+    <div className="min-h-screen flex flex-col bg-[#f8f9fa] font-sans">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 h-16 flex items-center fixed top-0 left-0 right-0 z-10">
-        <div className="max-w-6xl mx-auto w-full px-6 flex justify-between items-center">
-          <div className="flex items-center">
-            <svg width="24" height="24" className="text-gray-700 mr-3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M19 3H5C3.89 3 3 3.89 3 5V19C3 20.11 3.89 21 5 21H19C20.11 21 21 20.11 21 19V5C21 3.89 20.11 3 19 3ZM10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z" fill="#0071e3"/>
-            </svg>
-            <h1 className="text-xl font-medium text-gray-800">Drive Uploader</h1>
+      <header className="bg-white shadow-sm h-16 flex items-center fixed top-0 left-0 right-0 z-10 px-4 md:px-6">
+        <div className="flex items-center w-full">
+          {/* Logo */}
+          <div className="flex items-center mr-6">
+            <div className="w-10 h-10 flex items-center justify-center mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 87.3 78" className="w-6 h-6">
+                <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+                <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+                <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+              </svg>
+            </div>
+            <h1 className="text-xl font-normal text-gray-800">Drive</h1>
           </div>
           
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 focus:outline-none transition-colors"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#5F6368"/>
-              </svg>
-            </button>
-            
-            <AnimatePresence>
-              {showDropdown && (
-                <motion.div 
-                  className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-1 ring-1 ring-black ring-opacity-5"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <button
-                    onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                  >
-                    Logout
-                  </button>
-                </motion.div>
+          {/* Search bar */}
+          <div className="relative flex-grow max-w-3xl mx-4">
+            <div className={`flex items-center bg-[#f1f3f4] rounded-lg px-4 ${showSearch ? 'ring-1 ring-blue-500 shadow-sm' : ''}`}>
+              <Search className="h-5 w-5 text-gray-500 mr-3" />
+              <input
+                type="text"
+                placeholder="Search in Drive"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setShowSearch(true)}
+                onBlur={() => setShowSearch(false)}
+                className="py-3 w-full bg-transparent border-none focus:outline-none text-sm"
+              />
+              {showSearch && (
+                <button className="p-2 text-gray-500 hover:bg-gray-200 rounded-full">
+                  <Filter className="h-4 w-4" />
+                </button>
               )}
-            </AnimatePresence>
+            </div>
+          </div>
+          
+          {/* Right side actions */}
+          <div className="flex items-center space-x-3">
+            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-full">
+              <HelpCircle className="h-5 w-5" />
+            </button>
+            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-full">
+              <Settings className="h-5 w-5" />
+            </button>
+            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-full">
+              <AppWindow className="h-5 w-5" />
+            </button>
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="flex items-center justify-center w-9 h-9 rounded-full bg-[#1a73e8] text-white font-medium hover:bg-[#1a73e8]/90 focus:outline-none transition-colors"
+              >
+                {session?.user?.name ? session.user.name[0].toUpperCase() : 'U'}
+              </button>
+              
+              <AnimatePresence>
+                {showDropdown && (
+                  <motion.div 
+                    className="absolute right-0 mt-2 w-60 bg-white rounded-lg shadow-xl py-2 ring-1 ring-black ring-opacity-5 z-20"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="px-4 py-2 border-b border-gray-100">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 rounded-full bg-[#1a73e8] text-white font-medium flex items-center justify-center mr-3">
+                          {session?.user?.name ? session.user.name[0].toUpperCase() : 'U'}
+                        </div>
+                        <div>
+                          <div className="font-medium">{session?.user?.name || 'User'}</div>
+                          <div className="text-xs text-gray-500">{session?.user?.email || 'user@example.com'}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      Sign out
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-grow pt-24 pb-16 px-6">
-        <div className="max-w-5xl mx-auto">
-          {/* Upload section */}
-          <motion.div 
-            className="bg-white rounded-xl shadow-sm overflow-hidden mb-8"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="p-6">
-              <h2 className="text-xl font-medium text-gray-800 mb-5">Upload to Google Drive</h2>
-              
-              {/* Upload mode selector */}
-              <div className="inline-flex rounded-lg mb-6 bg-gray-100 p-1">
-                <button
-                  onClick={() => setUploadMode("file")}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                    uploadMode === "file"
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "bg-transparent text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  File Upload
-                </button>
-                <button
-                  onClick={() => setUploadMode("folder")}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                    uploadMode === "folder"
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "bg-transparent text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  Folder Upload
-                </button>
-              </div>
-
-              {/* Hidden file inputs */}
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                onChange={handleFileChange} 
-                multiple
-                className="hidden"
-              />
-              <input 
-                type="file" 
-                ref={folderInputRef as React.RefObject<HTMLInputElement>}
-                onChange={handleFileChange} 
-                multiple
-                // @ts-ignore
-                webkitdirectory="true"
-                className="hidden"
-              />
-
-              {/* Current folder indicator for uploads */}
-              {currentFolderId && folderPath.length > 0 && (
-                <motion.div 
-                  className="mb-4 text-sm bg-blue-50 p-3 rounded-lg border border-blue-100"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <p className="text-blue-600 flex items-center">
-                    <svg className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/>
-                    </svg>
-                    Uploading to: {folderPath[folderPath.length - 1]?.name || 'Root'}
-                  </p>
-                </motion.div>
-              )}
-
-              {/* Drop zone */}
-              <div
-                onClick={triggerFileInput}
-                className="border-2 border-dashed border-gray-200 bg-gray-50 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors"
+      <div className="flex flex-1 pt-16">
+        {/* Sidebar */}
+        <aside className="w-60 bg-white h-[calc(100vh-4rem)] fixed left-0 top-16 bottom-0 shadow-sm z-10">
+          {/* New button */}
+          <div className="p-3">
+            <div className="relative" ref={createMenuRef}>
+              <button
+                onClick={() => setShowCreateMenu(!showCreateMenu)}
+                className="flex items-center space-x-3 bg-white border border-gray-300 hover:shadow-md text-gray-700 font-medium rounded-lg px-6 py-3 transition-all"
               >
-                <div className="text-blue-500 mb-4">
-                  <motion.svg 
-                    width="40" 
-                    height="40" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                    whileHover={{ y: -5 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 15 }}
-                  >
-                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4C9.11 4 6.6 5.64 5.35 8.04C2.34 8.36 0 10.91 0 14C0 17.31 2.69 20 6 20H19C21.76 20 24 17.76 24 15C24 12.36 21.95 10.22 19.35 10.04ZM19 18H6C3.79 18 2 16.21 2 14C2 11.95 3.53 10.24 5.56 10.03L6.63 9.92L7.13 8.97C8.08 7.14 9.94 6 12 6C14.62 6 16.88 7.86 17.39 10.43L17.69 11.93L19.22 12.04C20.78 12.14 22 13.45 22 15C22 16.65 20.65 18 19 18ZM8 13H10.55V16H13.45V13H16L12 9L8 13Z" fill="#0071e3"/>
-                  </motion.svg>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-gray-700 mb-1">
-                    {uploadMode === "file" 
-                      ? "Drag files here or click to select" 
-                      : "Click to select a folder"
-                    }
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    All file types supported
-                  </p>
-                </div>
-                
-                {selectedFiles && selectedFiles.length > 0 && (
+                <Plus className="h-5 w-5" />
+                <span>New</span>
+              </button>
+              
+              <AnimatePresence>
+                {showCreateMenu && (
                   <motion.div 
-                    className="mt-4 px-3 py-1 bg-blue-50 rounded-full text-blue-600 text-sm font-medium"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-xl py-2 ring-1 ring-black ring-opacity-5 z-20"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
                   >
-                    {selectedFiles.length} {selectedFiles.length === 1 ? "file" : "files"} selected
-                  </motion.div>
-                )}
-              </div>
-
-              {/* Progress bar */}
-              {uploadProgress > 0 && (
-                <div className="mt-4">
-                  <motion.div 
-                    className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                  >
-                    <motion.div
-                      className="h-full bg-blue-500"
-                      initial={{ width: "0%" }}
-                      animate={{ width: `${uploadProgress}%` }}
-                      transition={{ type: "spring", stiffness: 100, damping: 20 }}
-                    />
-                  </motion.div>
-                  <div className="mt-1 text-right text-xs text-gray-500">
-                    {Math.round(uploadProgress)}%
-                  </div>
-                </div>
-              )}
-
-              {/* Upload button and message */}
-              <div className="mt-5 flex items-center justify-between">
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading || !selectedFiles}
-                  className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
-                    (!selectedFiles || uploading)
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      : "bg-blue-500 text-white hover:bg-blue-600 shadow-sm hover:shadow-md focus:outline-none"
-                  }`}
-                >
-                  {uploading ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Uploading...
-                    </span>
-                  ) : "Upload"}
-                </button>
-                
-                {uploadMessage && (
-                  <motion.div 
-                    className={`text-sm font-medium ${
-                      uploadMessage.includes("failed") || uploadMessage.includes("Please")
-                        ? "text-red-500"
-                        : "text-green-500"
-                    }`}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {uploadMessage}
-                  </motion.div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Files section */}
-          <motion.div 
-            className="bg-white rounded-xl shadow-sm overflow-hidden"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-xl font-medium text-gray-800">Google Drive Files</h2>
-                
-                {showDrive && (
-                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => {
+                        const newMode = "file";
+                        setUploadMode(newMode);
+                        triggerFileInput(newMode);
+                        setShowCreateMenu(false);
+                      }}
+                      className="flex items-center space-x-3 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      <Upload className="h-4 w-4 text-gray-500" />
+                      <span>File upload</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newMode = "folder";
+                        setUploadMode(newMode);
+                        triggerFileInput(newMode);
+                        setShowCreateMenu(false);
+                      }}
+                      className="flex items-center space-x-3 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      <Upload className="h-4 w-4 text-gray-500" />
+                      <span>Folder upload</span>
+                    </button>
                     <button
                       onClick={handleCreateFolder}
-                      className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors flex items-center"
+                      className="flex items-center space-x-3 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="mr-1.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                      New Folder
+                      <FolderPlus className="h-4 w-4 text-gray-500" />
+                      <span>New folder</span>
                     </button>
-                    <button
-                      onClick={() => handleListDrive(currentFolderId)}
-                      className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors flex items-center"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="mr-1.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Refresh
-                    </button>
-                  </div>
+                  </motion.div>
                 )}
-              </div>
+              </AnimatePresence>
+            </div>
+          </div>
+          
+          {/* Navigation links */}
+          <nav className="mt-2">
+            <ul>
+  <li>
+    <button 
+      onClick={() => handleListDrive(null)} 
+      className={`flex items-center w-full px-4 py-2 text-sm font-medium ${
+        currentView === "myDrive" 
+          ? "bg-[#e8f0fe] text-[#1a73e8]" 
+          : "text-gray-700 hover:bg-[#e8f0fe] hover:text-[#1a73e8]"
+      } rounded-r-full transition-colors`}
+    >
+      <HomeIcon className={`h-5 w-5 mr-3 ${currentView === "myDrive" ? "text-[#1a73e8]" : "text-gray-500"}`} />
+      <span>My Drive</span>
+    </button>
+  </li>
+  <li>
+    <button 
+      onClick={handleLoadRecent} 
+      className={`flex items-center w-full px-4 py-2 text-sm font-medium ${
+        currentView === "recent" 
+          ? "bg-[#e8f0fe] text-[#1a73e8]" 
+          : "text-gray-700 hover:bg-[#e8f0fe] hover:text-[#1a73e8]"
+      } rounded-r-full transition-colors`}
+    >
+      <Clock className={`h-5 w-5 mr-3 ${currentView === "recent" ? "text-[#1a73e8]" : "text-gray-500"}`} />
+      <span>Recent</span>
+    </button>
+  </li>
+  <li>
+    <button 
+      onClick={handleLoadStarred}
+      className={`flex items-center w-full px-4 py-2 text-sm font-medium ${
+        currentView === "starred" 
+          ? "bg-[#e8f0fe] text-[#1a73e8]" 
+          : "text-gray-700 hover:bg-[#e8f0fe] hover:text-[#1a73e8]"
+      } rounded-r-full transition-colors`}
+    >
+      <Star className={`h-5 w-5 mr-3 ${currentView === "starred" ? "text-[#1a73e8]" : "text-gray-500"}`} />
+      <span>Starred</span>
+    </button>
+  </li>
+  <li>
+    <button
+      onClick={handleLoadShared}
+      className={`flex items-center w-full px-4 py-2 text-sm font-medium ${
+        currentView === "shared" 
+          ? "bg-[#e8f0fe] text-[#1a73e8]" 
+          : "text-gray-700 hover:bg-[#e8f0fe] hover:text-[#1a73e8]"
+      } rounded-r-full transition-colors`}
+    >
+      <Share2 className={`h-5 w-5 mr-3 ${currentView === "shared" ? "text-[#1a73e8]" : "text-gray-500"}`} />
+      <span>Shared with me</span>
+    </button>
+  </li>
+  <li>
+    <button
+      onClick={handleLoadTrash}
+      className={`flex items-center w-full px-4 py-2 text-sm font-medium ${
+        currentView === "trash" 
+          ? "bg-[#e8f0fe] text-[#1a73e8]" 
+          : "text-gray-700 hover:bg-[#e8f0fe] hover:text-[#1a73e8]"
+      } rounded-r-full transition-colors`}
+    >
+      <Trash2 className={`h-5 w-5 mr-3 ${currentView === "trash" ? "text-[#1a73e8]" : "text-gray-500"}`} />
+      <span>Trash</span>
+    </button>
+  </li>
+  <li>
+    <button
+      onClick={handleLoadStorage}
+      className={`flex items-center w-full px-4 py-2 text-sm font-medium ${
+        currentView === "storage" 
+          ? "bg-[#e8f0fe] text-[#1a73e8]" 
+          : "text-gray-700 hover:bg-[#e8f0fe] hover:text-[#1a73e8]"
+      } rounded-r-full transition-colors`}
+    >
+      <Database className={`h-5 w-5 mr-3 ${currentView === "storage" ? "text-[#1a73e8]" : "text-gray-500"}`} />
+      <span>Storage</span>
+    </button>
+  </li>
+</ul>
+          </nav>
+          
+          {/* Storage usage */}
+          {/* Storage usage */}
+<div className="px-6 mt-6">
+  <div className="text-xs text-gray-500 mb-1">Storage</div>
+  <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+    <div 
+      className="bg-[#1a73e8] h-full" 
+      style={{ 
+        width: `${storageQuota.limit ? (storageQuota.usage / storageQuota.limit) * 100 : 0}%` 
+      }}
+    ></div>
+  </div>
+  <div className="text-xs text-gray-500 mt-1">
+    {formatFileSize(storageQuota.usage)} of {formatFileSize(storageQuota.limit)} used
+  </div>
+  <button className="mt-3 text-xs text-[#1a73e8] font-medium hover:text-[#0e60cb] transition-colors">
+    Get more storage
+  </button>
+</div>
+        </aside>
 
-              {showDrive && (
-                <div className="mb-5">
-                  {/* Search bar */}
-                  <div className="relative mb-4">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                      </svg>
+        {/* Main content area */}
+        <main className="ml-60 flex-1 px-6 py-6">
+          {/* Hidden file inputs */}
+          <input 
+            type="file" 
+            ref={fileInputRef}
+            onChange={handleFileChange} 
+            multiple
+            className="hidden"
+          />
+          <input 
+            type="file" 
+            ref={folderInputRef}
+            onChange={handleFileChange} 
+            multiple
+            //@ts-ignore
+            webkitdirectory="true"
+            directory=""
+            className="hidden"
+          />
+          
+          {/* Upload progress in bottom right corner (Google Drive style) */}
+          <AnimatePresence>
+            {showUploadStatus && (
+              <motion.div 
+                className="fixed bottom-6 right-6 z-50 bg-white rounded-lg shadow-lg overflow-hidden w-80"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="p-4 border-b border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <div className="font-medium text-gray-700">
+                      Uploading {totalFiles} {totalFiles === 1 ? 'item' : 'items'}
                     </div>
-                    <input
-                      type="text"
-                      placeholder="Search files and folders..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 pr-4 py-2 w-full border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                    />
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={() => setShowUploadStatus(false)} 
+                        className="p-1 hover:bg-gray-100 rounded-full"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="#5F6368"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-4">
+                  <div className="flex items-center mb-3">
+                    <div className="relative mr-4">
+                      <svg className="w-10 h-10" viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="16" fill="none" stroke="#e0e0e0" strokeWidth="2"></circle>
+                        <circle 
+                          cx="18" cy="18" r="16" fill="none" 
+                          stroke="#1a73e8" strokeWidth="2" 
+                          strokeDasharray="100"
+                          strokeDashoffset={100 - uploadProgress}
+                          transform="rotate(-90 18 18)"
+                        ></circle>
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center text-xs font-medium">
+                        {Math.round(uploadProgress)}%
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1">
+                      <div className="text-sm font-medium mb-1 truncate" title={currentUploadFile}>
+                        {currentUploadFile || (selectedFiles && selectedFiles[0]?.name)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatFileSize(uploadedSize)} of {formatFileSize(totalUploadSize)}
+                      </div>
+                    </div>
                   </div>
                   
-                  {/* Breadcrumb navigation */}
-                  <BreadcrumbNav />
+                  <div className="text-xs text-gray-500">
+                    {uploadedFiles} of {totalFiles} {totalFiles === 1 ? 'file' : 'files'} uploaded
+                  </div>
                 </div>
-              )}
-
-              {showDrive ? (
-                loadingFiles ? (
-                  <div className="text-center py-16">
-                    <motion.div 
-                      className="w-10 h-10 border-4 border-gray-200 border-t-blue-500 rounded-full mx-auto mb-4"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    />
-                    <p className="text-gray-500">Loading files...</p>
-                  </div>
-                ) : filteredFiles.length > 0 ? (
-                  <div className="overflow-x-auto -mx-6">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Name
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Type
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Size
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredFiles.map((file) => (
-                          <motion.tr 
-                            key={file.id} 
-                            className="hover:bg-gray-50 transition-colors"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <span className="mr-2 text-lg">{getFileIcon(file.mimeType)}</span>
-                                {file.mimeType.includes('folder') ? (
-                                  <button
-                                    onClick={() => navigateToFolder(file.id)}
-                                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                                  >
-                                    {file.name}
-                                  </button>
-                                ) : (
-                                  <span className="text-sm text-gray-700">{file.name}</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {file.mimeType.replace('application/', '').replace('vnd.google-apps.', '')}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {file.size ? formatFileSize(parseInt(file.size)) : '-'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <div className="flex space-x-2">
-                                <button
-                                  onClick={() => handleDelete(file.id, file.name, file.mimeType)}
-                                  className="p-1.5 rounded-full hover:bg-red-50 text-red-500 focus:outline-none transition-colors"
-                                  title="Delete"
-                                >
-                                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={() => handleMove(file.id, file.name, file.mimeType)}
-                                  className="p-1.5 rounded-full hover:bg-blue-50 text-blue-500 focus:outline-none transition-colors"
-                                  title="Move"
-                                >
-                                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-16">
-                    <motion.svg 
-                      width="48" 
-                      height="48" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="mx-auto mb-4 text-gray-300"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5 }}
-                    >
-                      <path d="M20 6H12L10 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.9 21.1 6 20 6ZM20 18H4V6H9.17L11.17 8H20V18ZM14.08 10.62L17.15 13.69L14.08 16.76L12.67 15.34L14.36 13.69L12.66 12.04L14.08 10.62ZM6.92 16.76L9.99 13.69L6.92 10.62L8.34 12.04L10.03 13.69L8.33 15.34L6.92 16.76Z" fill="currentColor"/>
-                    </motion.svg>
-                    <p className="text-gray-500">
-                      {searchQuery.trim() 
-                        ? "No files found matching your search" 
-                        : "No files found in this folder"}
-                    </p>
-                  </div>
-                )
-              ) : (
-                <div className="text-center py-16">
-                  <motion.button
-                    onClick={() => handleListDrive()}
-                    className="px-5 py-2.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm hover:shadow-md transition-all"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    View Files in Google Drive
-                  </motion.button>
-                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          {/* Drive header/toolbar */}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center">
+              <h2 className="text-xl font-normal text-gray-800 mr-4">My Drive</h2>
+              {uploadMessage && (
+                <motion.div 
+                  className={`text-sm font-medium px-3 py-1 rounded-full ${
+                    uploadMessage.includes("failed") || uploadMessage.includes("Please")
+                      ? "bg-red-50 text-red-500"
+                      : "bg-green-50 text-green-500"
+                  }`}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {uploadMessage}
+                </motion.div>
               )}
             </div>
-          </motion.div>
-        </div>
-      </main>
+            {currentView === "trash" && (
+  <button
+    onClick={handleEmptyTrash}
+    className="ml-4 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-md transition-colors"
+  >
+    Empty Trash
+  </button>
+)}
+            <div className="flex items-center space-x-2">
+              {selectedItems.length > 0 && (
+                <motion.div 
+                  className="flex space-x-2 mr-2"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                >
+                  <button
+                    onClick={batchDeleteSelected}
+                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-full"
+                    title="Delete selected"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </motion.div>
+              )}
+              
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-2 rounded-full ${viewMode === "list" ? "bg-gray-200 text-gray-800" : "text-gray-600 hover:bg-gray-100"}`}
+                title="List view"
+              >
+                <List className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-2 rounded-full ${viewMode === "grid" ? "bg-gray-200 text-gray-800" : "text-gray-600 hover:bg-gray-100"}`}
+                title="Grid view"
+              >
+                <Grid className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => {
+                  setSortBy("name");
+                  setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                }}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-full"
+                title="Sort by name"
+              >
+                <Info className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+          
+          {/* Breadcrumb navigation */}
+          {folderPath.length > 0 && (
+            <nav className="flex mb-4 text-sm overflow-x-auto py-1">
+              <ol className="flex items-center space-x-1">
+                {folderPath.map((folder, index) => (
+                  <li key={folder.id} className="flex items-center whitespace-nowrap">
+                    {index > 0 && <span className="mx-1 text-gray-300">/</span>}
+                    <button
+                      onClick={() => navigateToFolder(folder.id)}
+                      className={`hover:text-[#1a73e8] transition-colors ${
+                        index === folderPath.length - 1
+                          ? "font-medium text-[#1a73e8]"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      {folder.name}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          )}
+          
+          {showDrive ? (
+            loadingFiles ? (
+              <div className="text-center py-16">
+                <motion.div 
+                  className="w-10 h-10 border-4 border-gray-200 border-t-[#1a73e8] rounded-full mx-auto mb-4"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                />
+                <p className="text-gray-500">Loading files...</p>
+              </div>
+            ) : filteredFiles.length > 0 ? (
+              viewMode === "list" ? (
+                // List view
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-white">
+                      <tr>
+                        <th className="w-10 px-3 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedItems.length === filteredFiles.length && filteredFiles.length > 0}
+                            onChange={toggleSelectAll}
+                            className="h-4 w-4 rounded text-[#1a73e8] focus:ring-[#1a73e8]"
+                          />
+                        </th>
+                        <th 
+                          scope="col" 
+                          className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                          onClick={() => {
+                            setSortBy("name");
+                            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                          }}
+                        >
+                          <div className="flex items-center">
+                            Name
+                            {sortBy === "name" && (
+                              <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${sortOrder === "desc" ? "transform rotate-180" : ""}`} />
+                            )}
+                          </div>
+                        </th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Owner
+                        </th>
+                        <th 
+                          scope="col" 
+                          className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                          onClick={() => {
+                            setSortBy("modified");
+                            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                          }}
+                        >
+                          <div className="flex items-center">
+                            Last modified
+                            {sortBy === "modified" && (
+                              <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${sortOrder === "desc" ? "transform rotate-180" : ""}`} />
+                            )}
+                          </div>
+                        </th>
+                        <th 
+                          scope="col" 
+                          className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                          onClick={() => {
+                            setSortBy("size");
+                            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                          }}
+                        >
+                          <div className="flex items-center">
+                            File size
+                            {sortBy === "size" && (
+                              <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${sortOrder === "desc" ? "transform rotate-180" : ""}`} />
+                            )}
+                          </div>
+                        </th>
+                        <th scope="col" className="relative px-3 py-3">
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredFiles.map((file) => (
+<motion.tr 
+  key={file.id} 
+  className="hover:bg-gray-50 transition-colors cursor-pointer"
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{ duration: 0.3 }}
+  onDoubleClick={() => file.mimeType.includes('folder') ? navigateToFolder(file.id) : handleFileAction(file)}
+>
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={selectedItems.includes(file.id)}
+                              onChange={() => toggleItemSelection(file.id)}
+                              className="h-4 w-4 rounded text-[#1a73e8] focus:ring-[#1a73e8]"
+                            />
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap">
+  <div className="flex items-center">
+    <span className="text-lg mr-3">{getFileIcon(file.mimeType)}</span>
+    {file.mimeType.includes('folder') ? (
+      <button
+        onClick={() => navigateToFolder(file.id)}
+        className="text-sm text-gray-900 hover:text-[#1a73e8] hover:underline font-medium"
+      >
+        {file.name}
+      </button>
+    ) : (
+      <button
+        onClick={() => handleFileAction(file)}
+        className="text-sm text-gray-900 hover:text-[#1a73e8] hover:underline"
+      >
+        {file.name}
+      </button>
+    )}
+  </div>
+</td>
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <div className="flex items-center text-sm text-gray-500">
+                              <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center text-xs mr-2">
+                                M
+                              </div>
+                              <span>me</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {file.modifiedTime || "Feb 16, 2024"}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {file.size ? formatFileSize(parseInt(file.size)) : '-'}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex space-x-1">
+                              <button
+                                onClick={() => handleDelete(file.id, file.name, file.mimeType)}
+                                className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleMove(file.id, file.name, file.mimeType)}
+                                className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                                title="Move"
+                              >
+                                <ArrowUpRight className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                // Grid view
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {filteredFiles.map((file) => (
+                    <motion.div
+                      key={file.id}
+                      className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="relative">
+                        <div className="absolute top-2 left-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedItems.includes(file.id)}
+                            onChange={() => toggleItemSelection(file.id)}
+                          />
+                        </div>
+                        <div className="h-32 flex items-center justify-center bg-gray-50 border-b">
+                          <span className="text-4xl">{getFileIcon(file.mimeType)}</span>
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <div className="mb-1">
+  {file.mimeType.includes('folder') ? (
+    <button
+      onClick={() => navigateToFolder(file.id)}
+      className="text-sm text-gray-900 hover:text-[#1a73e8] hover:underline font-medium truncate block w-full text-left"
+    >
+      {file.name}
+    </button>
+  ) : (
+    <button
+      onClick={() => handleFileAction(file)}
+      className="text-sm text-gray-900 hover:text-[#1a73e8] hover:underline truncate block w-full text-left"
+    >
+      {file.name}
+    </button>
+  )}
+</div>
+                        <div className="flex justify-between items-center">
+                          <div className="text-xs text-gray-500">
+                            {file.modifiedTime || "Feb 16, 2024"}
+                          </div>
+                          <div className="flex space-x-1">
+  {currentView === "trash" ? (
+    <button
+      onClick={() => handleRestoreFromTrash(file.id)}
+      className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+      title="Restore from trash"
+    >
+      <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        width="16" 
+        height="16" 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        strokeWidth="2" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      >
+        <path d="M3 12h18"></path>
+        <path d="M12 3v18"></path>
+      </svg>
+    </button>
+  ) : (
+    <>
+      <button
+        onClick={() => handleToggleStar(file.id, !file.starred)}
+        className={`p-1 rounded-full hover:bg-gray-100 ${file.starred ? 'text-yellow-400' : 'text-gray-500'}`}
+        title={file.starred ? "Remove from starred" : "Add to starred"}
+      >
+        <Star className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => handleMoveToTrash(file.id)}
+        className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+        title="Move to trash"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => handleMove(file.id, file.name, file.mimeType)}
+        className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+        title="Move"
+      >
+        <ArrowUpRight className="h-4 w-4" />
+      </button>
+    </>
+  )}
+</div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )
+            ) : (
+              <div className="text-center py-16 bg-white rounded-xl shadow-sm">
+                <motion.svg 
+                  width="64" 
+                  height="64" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="mx-auto mb-4 text-gray-300"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <path d="M20 6H12L10 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.9 21.1 6 20 6ZM20 18H4V6H9.17L11.17 8H20V18ZM14.08 10.62L17.15 13.69L14.08 16.76L12.67 15.34L14.36 13.69L12.66 12.04L14.08 10.62ZM6.92 16.76L9.99 13.69L6.92 10.62L8.34 12.04L10.03 13.69L8.33 15.34L6.92 16.76Z" fill="currentColor"/>
+                </motion.svg>
+                <p className="text-gray-500">
+                  {searchQuery.trim() 
+                    ? "No files found matching your search" 
+                    : "No files found in this folder"}
+                </p>
+                <button
+                  onClick={handleCreateFolder}
+                  className="mt-4 px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1565c0] focus:outline-none transition-colors"
+                >
+                  Create folder
+                </button>
+              </div>
+            )
+          ) : (
+            <div className="text-center py-16 bg-white rounded-xl shadow-sm">
+              <motion.svg 
+                width="64" 
+                height="64"
+                viewBox="0 0 87.3 78" 
+                className="w-16 h-16 mx-auto mb-4 text-gray-300"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+              >
+                <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+                <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+                <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+              </motion.svg>
+              <h3 className="text-xl font-medium text-gray-700 mb-2">Welcome to Google Drive</h3>
+              <p className="text-gray-500 mb-6">Store, share, and collaborate on files and folders from any mobile device, tablet, or computer</p>
+              <motion.button
+                onClick={() => handleListDrive()}
+                className="px-5 py-2.5 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1565c0] focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:ring-offset-2 shadow-sm hover:shadow-md transition-all"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                View My Files
+              </motion.button>
+            </div>
+          )}
 
-      {/* Footer */}
-      <footer className="bg-white py-6 border-t border-gray-200">
-        <div className="max-w-6xl mx-auto px-6">
-          <p className="text-center text-sm text-gray-500">
-            Drive Uploader &copy; {new Date().getFullYear()}
-          </p>
+          {/* Storage view */}
+{currentView === "storage" && (
+  <div className="bg-white rounded-xl shadow-sm p-6">
+    <h3 className="text-lg font-medium text-gray-900 mb-4">Storage Details</h3>
+    
+    <div className="mb-6">
+      <div className="flex justify-between items-center mb-2">
+        <div className="text-sm font-medium">Storage used</div>
+        <div className="text-sm">{formatFileSize(storageQuota.usage)} of {formatFileSize(storageQuota.limit)}</div>
+      </div>
+      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div 
+          className="bg-[#1a73e8] h-full" 
+          style={{ 
+            width: `${storageQuota.limit ? (storageQuota.usage / storageQuota.limit) * 100 : 0}%` 
+          }}
+        ></div>
+      </div>
+    </div>
+    
+    <div className="space-y-4">
+      <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+        <div className="flex items-center">
+          <Database className="h-5 w-5 text-gray-500 mr-3" />
+          <span className="text-sm font-medium">My Drive storage</span>
         </div>
-      </footer>
+        <div className="text-sm text-gray-500">{formatFileSize(storageQuota.usageInDrive)}</div>
+      </div>
+      
+      <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+        <div className="flex items-center">
+          <Trash2 className="h-5 w-5 text-gray-500 mr-3" />
+          <span className="text-sm font-medium">Trash</span>
+        </div>
+        <div className="text-sm text-gray-500">{formatFileSize(storageQuota.usageInDriveTrash)}</div>
+      </div>
+      
+      <div className="mt-6">
+        <a 
+          href="https://one.google.com/storage" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="inline-flex items-center px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1565c0] transition-colors"
+        >
+          <span>Buy more storage</span>
+          <ArrowUpRight className="h-4 w-4 ml-2" />
+        </a>
+      </div>
+    </div>
+  </div>
+)}
+        </main>
+      </div>
 
       {/* Modal Dialog */}
       {showModal && <Modal />}
+      {showPreview && <PreviewModal />}
     </div>
   );
 }

@@ -63,11 +63,17 @@ export async function createFolderIfNotExist(folderName: string, parentFolderId:
 }
 
 export async function listFilesInFolder(folderId: string) {
-  const res = await drive.files.list({
-    q: `'${folderId}' in parents and trashed=false`,
-    fields: "files(id, name, mimeType, size)"
-  });
-  return res.data.files;
+  try {
+    const res = await drive.files.list({
+      q: `'${folderId}' in parents and trashed=false`,
+      fields: "files(id, name, mimeType, size, modifiedTime)",
+      orderBy: "folder,name"
+    });
+    return res.data.files;
+  } catch (error) {
+    console.error('Error listing files in folder:', error);
+    throw error;
+  }
 }
 
 async function getAuth() {
@@ -133,7 +139,7 @@ export async function isDescendantOfBase(
 
 export async function getFolderPath(
   folderId: string, 
-  baseFolderId: string, 
+  baseFolderId: string | null = null, 
   visitedFolders = new Set<string>()
 ): Promise<{ id: string, name: string }[]> {
   try {
@@ -148,7 +154,7 @@ export async function getFolderPath(
     let currentId = folderId;
     
     // Loop sampai mencapai folder dasar atau root
-    while (currentId && currentId !== baseFolderId) {
+    while (currentId && (baseFolderId === null || currentId !== baseFolderId)) {
       const folder = await getFolderDetails(currentId);
       if (folder.id && folder.name) {
         path.unshift({ id: folder.id, name: folder.name });
@@ -164,7 +170,7 @@ export async function getFolderPath(
       visitedFolders.add(currentId);
     }
     
-    // Tambahkan folder dasar ke path
+    // Tambahkan folder dasar ke path jika di-supply
     if (baseFolderId) {
       const baseFolder = await getFolderDetails(baseFolderId);
       if (baseFolder.id && baseFolder.name) {
@@ -176,5 +182,125 @@ export async function getFolderPath(
   } catch (error) {
     console.error('Error getting folder path:', error);
     return [];
+  }
+}
+
+// New functions for sidebar functionality
+
+// Get recently modified files
+export async function getRecentFiles(maxResults = 50) {
+  try {
+    const response = await drive.files.list({
+      orderBy: "modifiedTime desc",
+      pageSize: maxResults,
+      fields: "files(id, name, mimeType, size, modifiedTime, parents)",
+      q: "trashed = false"
+    });
+    
+    return response.data.files || [];
+  } catch (error) {
+    console.error("Error getting recent files:", error);
+    throw error;
+  }
+}
+
+// Get starred/important files
+export async function getStarredFiles() {
+  try {
+    const response = await drive.files.list({
+      q: "starred = true and trashed = false",
+      fields: "files(id, name, mimeType, size, modifiedTime, parents, starred)",
+      pageSize: 100
+    });
+    
+    return response.data.files || [];
+  } catch (error) {
+    console.error("Error getting starred files:", error);
+    throw error;
+  }
+}
+
+// Toggle starred status
+export async function toggleStarred(fileId: string, starred: boolean) {
+  try {
+    await drive.files.update({
+      fileId,
+      requestBody: {
+        starred
+      }
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error updating star status:", error);
+    throw error;
+  }
+}
+
+// Get trashed files
+export async function getTrashedFiles() {
+  try {
+    const response = await drive.files.list({
+      q: "trashed = true",
+      fields: "files(id, name, mimeType, size, modifiedTime, parents)",
+      pageSize: 100
+    });
+    
+    return response.data.files || [];
+  } catch (error) {
+    console.error("Error getting trashed files:", error);
+    throw error;
+  }
+}
+
+// Restore file from trash
+export async function restoreFromTrash(fileId: string) {
+  try {
+    await drive.files.update({
+      fileId,
+      requestBody: {
+        trashed: false
+      }
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error restoring from trash:", error);
+    throw error;
+  }
+}
+
+// Get files shared with me
+export async function getSharedFiles() {
+  try {
+    const response = await drive.files.list({
+      q: "sharedWithMe = true and trashed = false",
+      fields: "files(id, name, mimeType, size, modifiedTime, parents, sharingUser)",
+      pageSize: 100
+    });
+    
+    return response.data.files || [];
+  } catch (error) {
+    console.error("Error getting shared files:", error);
+    throw error;
+  }
+}
+
+// Get drive storage quota
+export async function getDriveStorageQuota() {
+  try {
+    const response = await drive.about.get({
+      fields: "storageQuota"
+    });
+    
+    return response.data.storageQuota || {
+      limit: 0,
+      usage: 0,
+      usageInDrive: 0,
+      usageInDriveTrash: 0
+    };
+  } catch (error) {
+    console.error("Error getting storage quota:", error);
+    throw error;
   }
 }

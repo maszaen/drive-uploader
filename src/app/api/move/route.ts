@@ -1,6 +1,6 @@
 // app/api/move/route.ts
-import { NextResponse } from "next/server";
 import { google } from "googleapis";
+import { NextResponse } from "next/server";
 import { isDescendantOfBase } from "../../../lib/googleDrive";
 
 export async function POST(req: Request) {
@@ -11,16 +11,10 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { fileId, destinationFolderId, password } = body;
+    const { fileId, destinationFolderId } = body;
 
     if (!fileId || !destinationFolderId) {
       return NextResponse.json({ message: "File ID dan Folder tujuan diperlukan" }, { status: 400 });
-    }
-    
-    // Verify password
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (!adminPassword || password !== adminPassword) {
-      return NextResponse.json({ message: "Invalid password" }, { status: 401 });
     }
 
     // Validate that both file and destination folder are descendants of the base folder

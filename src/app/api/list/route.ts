@@ -3,35 +3,25 @@ import { NextResponse } from "next/server";
 import { getFolderDetails, getFolderPath, listFilesInFolder } from "../../../lib/googleDrive";
 
 export async function GET(req: Request) {
-  const baseFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  if (!baseFolderId) {
-    return NextResponse.json({ message: "Google Drive folder ID tidak dikonfigurasi" }, { status: 500 });
-  }
-
   try {
-    // Get the folder ID and password from query parameters
+    // Get the folder ID from query parameters
     const url = new URL(req.url);
-    const folderId = url.searchParams.get('folderId') || baseFolderId;
-    const password = url.searchParams.get('password') || '';
+    const folderId = url.searchParams.get('folderId');
     
-    // Verify password
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (!adminPassword || password !== adminPassword) {
-      return NextResponse.json({ message: "Invalid password" }, { status: 401 });
-    }
-    
-    // List files in the specified folder
-    const files = await listFilesInFolder(folderId);
+    // If no folderId is provided, we'll list the root of Google Drive
+    // Instead of using a specific folder as the base
+    const files = await listFilesInFolder(folderId || 'root');
     
     // Get current folder details
-    const currentFolder = folderId !== baseFolderId 
-      ? await getFolderDetails(folderId)
-      : { id: baseFolderId, name: "Root" };
+    const currentFolder = folderId ? 
+      await getFolderDetails(folderId) : 
+      { id: 'root', name: "My Drive" };
     
     // Get folder path for navigation breadcrumbs
-    const folderPath = folderId !== baseFolderId
-      ? await getFolderPath(folderId, baseFolderId)
-      : [{ id: baseFolderId, name: "Root" }];
+    // Pass null as the second parameter to get the full path up to the root
+    const folderPath = folderId ? 
+      await getFolderPath(folderId, null) : 
+      [{ id: 'root', name: "My Drive" }];
     
     return NextResponse.json({ 
       files,
