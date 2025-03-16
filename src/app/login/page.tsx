@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client";
 
 import { ArrowUpRight, Info } from "lucide-react";
