@@ -530,8 +530,8 @@ export default function HomePage() {
               onClick={executeRename}
               disabled={!newName.trim() || newName === itemToRename.name || isRenaming}
               className={`px-4 py-2 ${!newName.trim() || newName === itemToRename.name || isRenaming
-                  ? "!text-black/50 cursor-default"
-                  : "hover:bg-base !rounded-full !text-primary"
+                ? "!text-black/50 cursor-default"
+                : "hover:bg-base !rounded-full !text-primary"
                 } text-sm font-medium transition-colors`}
             >
               {isRenaming ? "Renaming..." : "Rename"}
@@ -2413,42 +2413,41 @@ export default function HomePage() {
                     </button>
                   )}
                   <AnimatePresence>
-  {uploadMessage && (
-    <motion.div
-      key="upload-message"
-      className={`text-sm font-medium items-center flex flex-row px-3 py-1 rounded-full ${
-        uploadMessage.includes("failed") || uploadMessage.includes("Please")
-          ? "bg-red-50 text-red-500"
-          : "bg-green-50 text-green-500"
-      }`}
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ 
-        opacity: 1, 
-        x: 0,
-        transition: {
-          type: "tween",
-          ease: [0.4, 0, 0.2, 1],
-          duration: 0.3
-        }
-      }}
-      exit={{ 
-        opacity: 0, 
-        x: 20,
-        transition: {
-          type: "tween",
-          ease: [0.4, 0, 1, 1], 
-          duration: 0.2
-        }
-      }}
-    >
-      {uploadMessage}
-      <X
-        onClick={() => setUploadMessage("")}
-        className="h-4 w-4 ml-2 cursor-pointer"
-      />
-    </motion.div>
-  )}
-</AnimatePresence>
+                    {uploadMessage && (
+                      <motion.div
+                        key="upload-message"
+                        className={`text-sm font-medium items-center flex flex-row px-3 py-1 rounded-full ${uploadMessage.includes("failed") || uploadMessage.includes("Please")
+                            ? "bg-red-50 text-red-500"
+                            : "bg-green-50 text-green-500"
+                          }`}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{
+                          opacity: 1,
+                          x: 0,
+                          transition: {
+                            type: "tween",
+                            ease: [0.4, 0, 0.2, 1],
+                            duration: 0.3
+                          }
+                        }}
+                        exit={{
+                          opacity: 0,
+                          x: 20,
+                          transition: {
+                            type: "tween",
+                            ease: [0.4, 0, 1, 1],
+                            duration: 0.2
+                          }
+                        }}
+                      >
+                        {uploadMessage}
+                        <X
+                          onClick={() => setUploadMessage("")}
+                          className="h-4 w-4 ml-2 cursor-pointer"
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 <div className="flex items-center space-x-2">
