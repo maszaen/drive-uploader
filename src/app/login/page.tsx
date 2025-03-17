@@ -1,4 +1,4 @@
-/* eslint-disable */
+
 "use client";
 
 import { ArrowUpRight, Info } from "lucide-react";
@@ -24,120 +24,65 @@ export default function LoginPage() {
   const [isDisabled, setIsDisabled] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const [userIP, setUserIP] = useState("");
-  const [initialLoading, setInitialLoading] = useState(true); // Initial loading state
+  const [initialLoading, setInitialLoading] = useState(true);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    console.log(
-      "%cNgapain buka DevTools? Mau nyari celah? Percuma, gak bakal bisa.",
-      "color: gray; font-size: 20px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;"
-    );
-    console.log(
-      "%cMau hapus local storage? Gak akan ngaruh bro.",
-      "color: gray; font-size: 20px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;"
-    );
-    console.log(
-      "%cUdah, tutup DevTools-nya. Gak ada yang bisa dioprek di sini.",
-      "color: gray; font-size: 20px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;"
-    );
-    console.log(`
-░░░░░░▄▄▄▄▀▀▀▀▀▀▀▀▄▄▄▄▄▄▄
-░░░░░█░░░░░░░░░░░░░░░░░░▀▀▄
-░░░░█░░░░░░░░░░░░░░░░░░░░░░█
-░░░█░░░░░░▄██▀▄▄░░░░░▄▄▄░░░░█
-░▄▀░▄▄▄░░█▀▀▀▀▄▄█░░░██▄▄█░░░░█
-█░░█░▄░▀▄▄▄▀░░░░░░░░█░░░░░░░░░█
-█░░█░█▀▄▄░░░░░█▀░░░░▀▄░░▄▀▀▀▄░█
-░█░▀▄░█▄░█▀▄▄░▀░▀▀░▄▄▀░░░░█░░█
-░░█░░░▀▄▀█▄▄░█▀▀▀▄▄▄▄▀▀█▀██░█
-░░░█░░░░██░░▀█▄▄▄█▄▄█▄▄██▄░░█
-░░░░█░░░░▀▀▄░█░░░█░█▀█▀█▀██░█
-░░░░░▀▄░░░░░▀▀▄▄▄█▄█▄█▄█▄▀░░█
-░░░░░░░▀▄▄░░░░░░░░░░░░░░░░░░░█
-░░▐▌░█░░░░▀▀▄▄░░░░░░░░░░░░░░░█
-░░░█▐▌░░░░░░█░▀▄▄▄▄▄░░░░░░░░█
-░░███░░░░░▄▄█░▄▄░██▄▄▄▄▄▄▄▄▀
-░▐████░░▄▀█▀█▄▄▄▄▄█▀▄▀▄
-░░█░░▌░█░░░▀▄░█▀█░▄▀░░░█
-░░█░░▌░█░░█░░█░░░█░░█░░█
-░░█░░▀▀░░██░░█░░░█░░█░░█
-░░░▀▀▄▄▀▀░█░░░▀▄▀▀▀▀█░░█
-░░░░░░░░░░█░░░░▄░░▄██▄▄▀
-░░░░░░░░░░█░░░░▄░░████
-░░░░░░░░░░█▄░░▄▄▄░░▄█
-░░░░░░░░░░░█▀▀░▄░▀▀█
-░░░░░░░░░░░█░░░█░░░█
-░░░░░░░░░░░█░░░▐░░░█
-░░░░░░░░░░░█░░░▐░░░█
-░░░░░░░░░░░█░░░▐░░░█
-░░░░░░░░░░░█░░░▐░░░█
-░░░░░░░░░░░█░░░▐░░░█
-░░░░░░░░░░░█▄▄▄▐▄▄▄█
-░░░░░░░▄▄▄▄▀▄▄▀█▀▄▄▀▄▄▄▄
-░░░░░▄▀▄░▄░▄░░░█░░░▄░▄░▄▀▄
-░░░░░█▄▄▄▄▄▄▄▄▄▀▄▄▄▄▄▄▄▄▄█
-
-%c Salam hangat "developer ganteng"`, `color: gray; font-size: 20px; font-weight: bold; font-family: Arial, Helvetica, sans-serif;
-    `);
+;
+;
+;
+;
   }, []);
 
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        // Keep loading on for initial data fetch
+
         setInitialLoading(true);
-        
-        // Fetch IP and block status in parallel
+
         const [ipResponse, blockResponse] = await Promise.allSettled([
           fetch(`${API_URL}/get-ip`),
           fetch(`${API_URL}/is-blocked`)
         ]);
-        
-        // Process IP response
+
         if (ipResponse.status === 'fulfilled' && ipResponse.value.ok) {
           const ipData = await ipResponse.value.json();
           setUserIP(ipData.ip);
         } else {
-          console.error("Error fetching IP:", ipResponse);
+
           setUserIP("Unable to detect IP");
         }
-        
-        // Process block status response
+
         if (blockResponse.status === 'fulfilled' && blockResponse.value.ok) {
           const blockData = await blockResponse.value.json();
           if (blockData.blocked) {
             setIsLocked(true);
           }
         } else {
-          console.error("Error checking block status:", blockResponse);
-          // Use local storage as fallback
+
           if (localStorage.getItem("isLocked")) {
             setIsLocked(true);
           }
         }
-        
-        // Check local storage for disabled state
+
         if (localStorage.getItem("isDisabled")) {
           setIsDisabled(true);
         }
-        
-        // Simulate minimum loading time for better UX
+
         setTimeout(() => {
           setInitialLoading(false);
-        }, 800); // Minimum loading time of 800ms for better visual effect
-        
+        }, 800);
+
       } catch (error) {
-        console.error("Error during initial data fetch:", error);
-        
-        // Fallback to local storage
+
         if (localStorage.getItem("isLocked")) {
           setIsLocked(true);
         }
         if (localStorage.getItem("isDisabled")) {
           setIsDisabled(true);
         }
-        
+
         setInitialLoading(false);
       }
     };
@@ -145,13 +90,11 @@ export default function LoginPage() {
     fetchInitialData();
   }, []);
 
-  // Report failed login attempts to the server
   const reportFailedAttempt = async (attempts: number) => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      // Using correct endpoint from your server code
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       const response = await fetch(`${API_URL}/login-attempt`, {
         method: 'POST',
         headers: {
@@ -160,21 +103,19 @@ export default function LoginPage() {
         body: JSON.stringify({ attempts }),
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
-      
-      // Handle different response status codes
+
       if (response.status === 403) {
         triggerLockout();
         localStorage.setItem("isLocked", "true");
         return { blocked: true };
       }
-      
+
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error("Error reporting failed attempt:", error);
-      // If API call fails, still trigger lockout after 3 attempts for client-side protection
+
       if (attempts >= 3) {
         triggerLockout();
         localStorage.setItem("isLocked", "true");
@@ -186,10 +127,8 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Jika akun terkunci, hentikan proses login
     if (isLocked) return;
 
-    // Cek jika password kosong
     if (!password) {
       setError("Password cannot be empty.");
       return;
@@ -198,8 +137,6 @@ export default function LoginPage() {
     setIsLoading(true);
     setError("");
 
-    // For debugging - log what's happening
-    if (DEBUG) console.log("Attempting login with password:", password ? "********" : "empty");
 
     try {
       const res = await signIn("credentials", { 
@@ -208,29 +145,27 @@ export default function LoginPage() {
         callbackUrl: "/"
       });
 
-      if (DEBUG) console.log("Sign in response:", res);
 
       if (res?.error) {
         const newFailedAttempts = failedAttempts + 1;
         setFailedAttempts(newFailedAttempts);
 
-        if (DEBUG) console.log("Failed attempt #", newFailedAttempts);
+         
 
         try {
-          // Report failed attempt to server
+
           const reportResult = await reportFailedAttempt(newFailedAttempts);
-          if (DEBUG) console.log("Report result:", reportResult);
         } catch (apiError) {
-          console.error("Could not report to API, using local fallback");
-          // Continue with local logic even if API call fails
-        }
+    // Silently catch the error
+    // console.error(apiError);
+    }
 
         setTimeout(() => {
           setIsLoading(false);
 
           if (newFailedAttempts >= 3) {
-            // Trigger lockout
-            if (DEBUG) console.log("Triggering lockout after 3 failed attempts");
+
+             
             triggerLockout();
             localStorage.setItem("isLocked", "true");
           } else {
@@ -238,18 +173,18 @@ export default function LoginPage() {
           }
         }, 1000);
       } else if (res?.url) {
-        if (DEBUG) console.log("Login successful, redirecting to:", res.url);
+         
         setTimeout(() => router.push("/"), 1000);
       } else {
-        // Handle unexpected response
-        if (DEBUG) console.log("Unexpected response:", res);
+
+         
         setTimeout(() => {
           setError("An error occurred. Please try again.");
           setIsLoading(false);
         }, 1000);
       }
     } catch (error) {
-      console.error("Login error:", error);
+
       setTimeout(() => {
         setError("An error occurred. Please try again.");
         setIsLoading(false);
@@ -258,44 +193,41 @@ export default function LoginPage() {
   };
 
   const triggerLockout = () => {
-    // Clear existing error
+
     setError("Your IP has been blocked due to multiple failed login attempts.");
     setIsLocked(true);
-    
-    // Start redirect countdown
+
     setRedirectCountdown(10);
   };
 
   const handleForgotPassword = (e: React.MouseEvent) => {
     e.preventDefault();
     if (isForgotClicked) return;
-    
+
     setIsForgotClicked(true);
-    
-    // Erase text with typing animation
+
     let text = forgotPasswordText;
     const eraseInterval = setInterval(() => {
       text = text.substring(0, text.length - 1);
       setForgotPasswordText(text);
-      
+
       if (text.length === 1) {
         clearInterval(eraseInterval);
-        
-        // Type new message
+
         const messages = [
           "Only admin has access to this feature.",
           "This feature is restricted."
         ];
-        
+
         const randomMessage = messages[Math.floor(Math.random() * messages.length)];
         let newText = "";
         let charIndex = 0;
-        
+
         const typeInterval = setInterval(() => {
           newText += randomMessage[charIndex];
           setForgotPasswordText(newText);
           charIndex++;
-          
+
           if (charIndex === randomMessage.length) {
             clearInterval(typeInterval);
             setIsDisabled(true);
@@ -308,7 +240,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     let countdownInterval: NodeJS.Timeout | null = null;
-    
+
     if (redirectCountdown !== null && redirectCountdown > 0) {
       countdownInterval = setInterval(() => {
         setRedirectCountdown((prev) => {
@@ -319,26 +251,25 @@ export default function LoginPage() {
         });
       }, 1000);
     } else if (redirectCountdown === 0) {
-      // Redirect to Google after countdown
+
       window.location.href = "https://www.google.com";
     }
-    
+
     return () => {
       if (countdownInterval) clearInterval(countdownInterval);
     };
   }, [redirectCountdown]);
 
-  // If in initial loading state, show loading UI
   if (initialLoading) {
     return (
-      <div className="min-h-screen px-20 select-none flex flex-col items-center justify-center p-4 transition-all duration-500 bg-base">
-        <div className="w-full max-w-[58.5rem]">
-          <div className="rounded-3xl overflow-hidden shadow-default p-8 relative transition-all duration-500 bg-fore">
-            {/* Full-width loading bar */}
+      <div className="min-h-screen px-0 md:px-10 lg:px-20 select-none flex flex-col items-center justify-center transition-all duration-500 bg-fore md:bg-base">
+        <div className="w-full max-w-full md:max-w-[58.5rem]">
+          <div className="md:rounded-3xl h-screen md:h-auto overflow-hidden shadow-default p-8 relative transition-all duration-500 bg-fore">
+
             <div className="absolute top-0 left-0 w-full h-1 bg-gray-200 overflow-hidden">
               <div className="loading-bar"></div>
             </div>
-            
+
             <div className="min-h-[286px] flex flex-col items-center justify-center">
               <img 
                 src="/images/drivogle.png" 
@@ -347,11 +278,11 @@ export default function LoginPage() {
               />
               <div className="text-center">
                 <h2 className="text-xl font-medium text-gray-700">Sign in to Drivogle</h2>
-                <p className="text-sm text-gray-500 mt-2">Please wait while we set up a secure connection</p>
+                <p className="text-sm font-normal text-gray-500 mt-2">Please wait while we set up a secure connection</p>
               </div>
             </div>
           </div>
-          <div className="mt-6 flex text-gray-700 justify-between text-xs px-5">
+          <div className="mt-6 hidden md:flex text-gray-700 justify-between text-xs px-5">
             <a href="#" className="gap-1 flex items-center flex-row hover:bg-gray-200 rounded-md p-1 px-2 transition-colors duration-200 ">
               Privacy policy <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
             </a>
@@ -361,10 +292,9 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
-        
-        {/* Add CSS for animations */}
+
         <style jsx global>{`
-          /* Google-style loading bar animation */
+
           .loading-bar {
             width: 30%;
             height: 100%;
@@ -372,7 +302,7 @@ export default function LoginPage() {
             position: absolute;
             animation: loading 1.5s infinite ease-in-out;
           }
-          
+
           @keyframes loading {
             0% {
               left: -30%;
@@ -390,46 +320,46 @@ export default function LoginPage() {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col select-none items-center justify-center p-4 px-20 transition-all duration-500 bg-base`}>
+    <div className={`min-h-screen flex flex-col select-none items-center justify-center px-0 md:px-10 lg:px-20 transition-all duration-500 bg-base md:bg-base`}>
       <div className="w-full max-w-[58.5rem]">
-        <div className={`rounded-3xl overflow-hidden shadow-default p-8 relative transition-all duration-500 bg-fore`}>
-          {/* Google-style loop loading bar */}
+        <div className={`md:rounded-3xl overflow-hidden h-screen md:h-auto shadow-default p-8 relative transition-all duration-500 bg-fore`}>
+
           {isLoading && (
             <div className="absolute top-0 left-0 w-full h-1 bg-gray-200 overflow-hidden">
               <div className="loading-bar"></div>
             </div>
           )}
-          
-          <div className="flex flex-row">
+
+          <div className="flex flex-col md:flex-row">
             <div className="mb-6 max-w-sm w-full mr-0 lg:mr-15">
               <img 
                 src="/images/drivogle.png" 
                 alt="Google Logo" 
                 className="mb-6 h-6 min-h-[2.4rem] min-w-[2.4rem]"
               />
-              
-              <h1 className={`!font-product-sans text-4xl font-light mb-4 ${isLocked ? 'text-gray-800' : 'text-gray-800'}`}>
+
+              <h1 className={`!font-product-sans text-4xl font-normal leading-10 pr-10 mb-4 ${isLocked ? 'text-gray-800' : 'text-gray-800'}`}>
                 {isLocked || isDisabled ? "Access Restricted" : "Sign in"}
               </h1>
-              <p className={`mt-1 text-sm font-light line-h text-gray-700`}>
+              <p className={`mt-1 text-sm font-normal line-h text-gray-700 pr-10`}>
                 {isLocked ? 
                   "Too many failed login attempts. Please try again later." : 
                   isDisabled ? 
                     "You no longer have access to this website. Please leave and do not attempt to return." : 
                     "Enter the application password to continue. This is an independent service and not associated with Google."}
               </p>
-              
+
               {redirectCountdown !== null && (
                 <div className="mt-4 p-4 border border-blue-200 bg-blue-50 text-blue-800 rounded-md">
                   <p className="font-medium">Redirecting in {redirectCountdown} seconds</p>
-                  <p className="text-sm mt-1">You will be automatically redirected to Google.com</p>
+                  <p className="text-sm font-normal mt-1">You will be automatically redirected to Google.com</p>
                 </div>
               )}
             </div>
-            
+
             <form ref={formRef} onSubmit={handleSubmit} className={`mt-18 flex flex-col w-full justify-center transition-all duration-300`}>
               <div className={`${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
-                {/* Google-style floating label input */}
+
                 <div className={`relative ${isDisabled || isLocked ? 'opacity-50 pointer-events-none' : ''}`}>
                   <input
                     id="password"
@@ -447,18 +377,18 @@ export default function LoginPage() {
                   />
                   <label 
                     htmlFor="password" 
-                    className={`absolute text-sm text-light  transition-all duration-200 pointer-events-none px-1.5
+                    className={`absolute text-sm font-normal transition-all duration-200 pointer-events-none px-1.5
                       ${isInputFocused || password ? 
-                        'text-xxs -top-2 text-primary' : 
+                        'text-xxs -top-2 text-primary bg-white' : 
                         'top-1/2 transform -translate-y-1/2 text-gray-500'
                       } 
-                      ${isLocked || isDisabled ? 'bg-gray-100' : 'bg-white'}
+                      ${isLocked || isDisabled ? 'bg-gray-100' : ''}
                       left-2`}
                   >
                     Enter password
                   </label>
                 </div>
-                
+
                 <div className="mt-2">
                   <a 
                     href="#" 
@@ -474,15 +404,15 @@ export default function LoginPage() {
                   </a>
                 </div>
               </div>
-              
+
               {error && (
-                <div className="flex flex-row gap-2 mt-4 text-xs py-2 rounded-md text-red-600">
+                <div className="flex flex-row font-normal gap-2 mt-4 text-xs py-2 rounded-md text-red-600">
                   <Info className="w-4 h-4" strokeWidth={1} />
                   {error}
                 </div>
               )}
 
-              <div className="mt-6 text-xs">
+              <div className="mt-6 text-xs font-normal">
                 <p className={`${isLocked ? "text-red-400" : "text-gray-600"} `}>
                   {isLocked ? "Your current IP address has been temporarily blocked due to multiple failed login attempts." : isDisabled ? "You're attempting to log in? Interesting. However, this isn't for you." : "Your current IP address will be blocked after multiple failed attempts."} 
                 </p>
@@ -533,8 +463,8 @@ export default function LoginPage() {
             </form>
           </div>
         </div>
-        
-        <div className="mt-6 flex text-gray-700 justify-between text-xs px-5">
+
+        <div className="mt-6 hidden md:flex text-gray-700 justify-between text-xs px-5">
           <a href="#" className="gap-1 flex items-center flex-row hover:bg-gray-200 rounded-md p-1 px-2 transition-colors duration-200 ">
             Privacy policy <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
           </a>
@@ -544,10 +474,9 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-      
-      {/* Add CSS for animations */}
+
       <style jsx global>{`
-        /* Google-style loading bar animation */
+
         .loading-bar {
           width: 30%;
           height: 100%;
@@ -555,7 +484,7 @@ export default function LoginPage() {
           position: absolute;
           animation: loading 1.5s infinite ease-in-out;
         }
-        
+
         @keyframes loading {
           0% {
             left: -30%;

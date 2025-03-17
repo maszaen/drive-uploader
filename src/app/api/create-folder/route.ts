@@ -1,4 +1,4 @@
-// app/api/create-folder/route.ts
+
 import { google } from "googleapis";
 import { NextResponse } from "next/server";
 
@@ -11,10 +11,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Nama folder diperlukan" }, { status: 400 });
     }
 
-    // Jika tidak ada parentFolderId, gunakan "root" (folder utama di Google Drive)
     const targetFolderId = parentFolderId || "root";
 
-    // Initialize Google Drive API
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET
@@ -29,7 +27,6 @@ export async function POST(req: Request) {
       auth: oauth2Client
     });
 
-    // Create the folder
     const fileMetadata = {
       name: folderName,
       mimeType: "application/vnd.google-apps.folder",
@@ -46,7 +43,7 @@ export async function POST(req: Request) {
       folder: folder.data 
     });
   } catch (error) {
-    console.error("Create folder error:", error);
+
     return NextResponse.json({ message: "Terjadi kesalahan saat membuat folder" }, { status: 500 });
   }
 }

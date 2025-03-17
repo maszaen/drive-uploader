@@ -3,7 +3,7 @@ import Image from "next/image";
 const GoogleStyleAvatar: React.FC<{ size?: number; src: string }> = ({ size = 100, src }) => {
   return (
     <div style={{ position: "relative", width: size, height: size }}>
-      {/* Avatar di Tengah */}
+      {}
       <Image
         src={src}
         alt="User Avatar"
@@ -18,7 +18,7 @@ const GoogleStyleAvatar: React.FC<{ size?: number; src: string }> = ({ size = 10
         }}
       />
 
-      {/* Border Google */}
+      {}
       <svg width={size} height={size} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <mask id="mask0">
           <path

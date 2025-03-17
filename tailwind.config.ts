@@ -272,6 +272,7 @@ const config: Config = {
         'smc': '4px', 
         'xlc': '1.25rem',
       },
+
       boxShadow: {
         default: " 0 4px 10px rgba(0, 0, 0, 0.0025)",
         card: "0px 1px 3px rgba(0, 0, 0, 0.12)",
@@ -364,6 +365,9 @@ const config: Config = {
         line2: "line-revert 8s infinite linear",
         line3: "line 7s infinite linear",
       },
+    },
+    corePlugins: {
+      divideColor: true,
     },
   },
   plugins: [],

@@ -22,7 +22,7 @@
     @apply relative !important;
   }
   body {
-    @apply antialiased tracking-wide relative bg-base !font-google-sans text-base font-extralight text-fore dark:bg-boxdark-2 !important;
+    @apply antialiased tracking-wide relative bg-white !font-google-sans text-base font-extralight text-fore dark:bg-boxdark-2 !important;
   }
 
   * {
