@@ -66,15 +66,15 @@
   }
   
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-gray-2;
+    @apply bg-gray-700/20;
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-primary/50 rounded;
+    @apply bg-gray-700/50 rounded;
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-primary;
+    @apply bg-gray-700;
   }
 }
 

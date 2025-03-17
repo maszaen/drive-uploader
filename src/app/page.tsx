@@ -2,7 +2,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { AppWindow, ArrowUpRight, ChevronDown, Clock, Database, Filter, FolderPlus, Grid, HelpCircle, Home as HomeIcon, Info, List, Plus, Search, Settings, Share2, Star, Trash2, Upload } from "lucide-react";
+import { AppWindow, ArrowUpRight, ChevronDown, Clock, Database, Filter, FolderPlus, Grid, HelpCircle, Home as HomeIcon, Info, List, Pencil, Plus, Search, Settings, Share2, Star, Trash2, Upload } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -81,9 +81,8 @@ export default function HomePage() {
   const [sortBy, setSortBy] = useState<SortByOptions>("name");
   const [sortOrder, setSortOrder] = useState<SortOrderOptions>("asc");
 
-  // Current view state
+  const [multipleSelect, setMultipleSelect] = useState<boolean>(false);
   const [currentView, setCurrentView] = useState<string>("myDrive");
-  // Storage quota information
   const [storageQuota, setStorageQuota] = useState<{
     limit: number;
     usage: number;
@@ -104,6 +103,10 @@ export default function HomePage() {
     previewType: "image" | "pdf" | "document" | "spreadsheet" | "presentation" | "video" | "audio" | "text" | "code" | "unknown";
   }
 
+  const handleMultipleSelect = () => {
+    setMultipleSelect(!multipleSelect);
+    setSelectedItems([]);
+  }
   // Function to handle loading recent files
   const handleLoadRecent = async () => {
     try {
@@ -1219,8 +1222,8 @@ export default function HomePage() {
     if (!showModal) return null;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+      <div className="fixed inset-0 bg-black bg-opacity-30 bg-black/30 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-xl p-4 px-6 pt-5 w-full max-w-md mx-4">
           {modalType === "delete" && selectedFile && (
             <>
               <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
@@ -1233,13 +1236,13 @@ export default function HomePage() {
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium rounded-md transition-colors"
+                  className="px-4 py-2 rounded-full hover:bg-base text-primary text-sm font-medium transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-md transition-colors"
+                  className="px-4 py-2 rounded-full hover:bg-red/10 text-red text-sm font-medium transition-colors"
                 >
                   Delete
                 </button>
@@ -1255,7 +1258,7 @@ export default function HomePage() {
                   Select Destination Folder
                 </label>
                 <select
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+                  className="w-full border text-black border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none bg-white"
                   value={targetFolderId || ""}
                   onChange={(e) => setTargetFolderId(e.target.value)}
                 >
@@ -1270,7 +1273,7 @@ export default function HomePage() {
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium rounded-md transition-colors"
+                  className="px-4 py-2 rounded-full hover:bg-base text-primary text-sm font-medium transition-colors"
                 >
                   Cancel
                 </button>
@@ -1278,9 +1281,9 @@ export default function HomePage() {
                   onClick={confirmMove}
                   disabled={!targetFolderId}
                   className={`px-4 py-2 ${!targetFolderId
-                    ? "bg-blue-300 cursor-not-allowed"
-                    : "bg-blue-500 hover:bg-blue-600"
-                    } text-white text-sm font-medium rounded-md transition-colors`}
+                    ? "!text-black/50 cursor-default"
+                    : "hover:bg-base !rounded-full !text-primary"
+                    } text-sm font-medium transition-colors`}
                 >
                   Move
                 </button>
@@ -1300,7 +1303,7 @@ export default function HomePage() {
                   ref={newFolderInputRef}
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 text-black rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   placeholder="Enter folder name"
                   autoFocus
                 />
@@ -1308,7 +1311,7 @@ export default function HomePage() {
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium rounded-md transition-colors"
+                  className="px-4 py-2 rounded-full hover:bg-base text-primary text-sm font-medium transition-colors"
                 >
                   Cancel
                 </button>
@@ -1316,9 +1319,9 @@ export default function HomePage() {
                   onClick={confirmCreateFolder}
                   disabled={!newFolderName}
                   className={`px-4 py-2 ${!newFolderName
-                    ? "bg-blue-300 cursor-not-allowed"
-                    : "bg-blue-500 hover:bg-blue-600"
-                    } text-white text-sm font-medium rounded-md transition-colors`}
+                    ? "!text-black/50 cursor-default"
+                    : "hover:bg-base !rounded-full !text-primary"
+                    } text-sm font-medium transition-colors`}
                 >
                   Create Folder
                 </button>
@@ -1342,8 +1345,20 @@ export default function HomePage() {
     );
   }
 
+  if (status === "unauthenticated") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
+        <motion.div
+          className="w-10 h-10 border-4 border-gray-300 border-t-blue-500 rounded-full"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen font-google-sans flex flex-col bg-[#f8f9fa] font-sans">
+    <div className="font-product-sans flex flex-col bg-[#f8f9fa] font-sans">
 
       {/* Main content */}
       <div className="flex flex-1">
@@ -1569,8 +1584,8 @@ export default function HomePage() {
                             {session?.user?.name ? session.user.name[0].toUpperCase() : 'U'}
                           </div>
                           <div>
-                            <div className="font-medium">{session?.user?.name || 'User'}</div>
-                            <div className="text-xs text-gray-500">{session?.user?.email || 'user@example.com'}</div>
+                            <div className="font-medium text-black">{session?.user?.name || 'User'}</div>
+                            <div className="text-xs text-gray-500">{session?.user?.email || 'no-email'}</div>
                           </div>
                         </div>
                       </div>
@@ -1678,13 +1693,21 @@ export default function HomePage() {
                   <h2 className="text-2xl font-product-sans font-normal text-gray-800 mr-4">
                     {folderPath.length > 0 ? folderPath[folderPath.length - 1].name : "My Drive"}
                   </h2>
+                  {currentView === "trash" && (
+                    <button
+                      onClick={handleEmptyTrash}
+                      className="mx-2 mr-3 flex flex-row gap-2 px-4 py-2 text-primary border border-gray-400 bg-base-1 hover:bg-white rounded-full text-sm font-medium transition-colors"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                      Empty Trash
+                    </button>
+                  )}
                   {uploadMessage && (
                     <motion.div
-                      className={`text-sm font-medium px-3 py-1 rounded-full ${
-                        uploadMessage.includes("failed") || uploadMessage.includes("Please")
-                          ? "bg-red-50 text-red-500"
-                          : "bg-green-50 text-green-500"
-                      }`}
+                      className={`text-sm font-medium px-3 py-1 rounded-full ${uploadMessage.includes("failed") || uploadMessage.includes("Please")
+                        ? "bg-red-50 text-red-500"
+                        : "bg-green-50 text-green-500"
+                        }`}
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3 }}
@@ -1693,15 +1716,9 @@ export default function HomePage() {
                     </motion.div>
                   )}
                 </div>
-                {currentView === "trash" && (
-                  <button
-                    onClick={handleEmptyTrash}
-                    className="ml-4 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-md transition-colors"
-                  >
-                    Empty Trash
-                  </button>
-                )}
+
                 <div className="flex items-center space-x-2">
+
                   {selectedItems.length > 0 && (
                     <motion.div
                       className="flex space-x-2 mr-2"
@@ -1718,285 +1735,245 @@ export default function HomePage() {
                     </motion.div>
                   )}
 
+
                   <button
-                    onClick={() => setViewMode("list")}
-                    className={`p-2 rounded-full ${viewMode === "list" ? "bg-gray-200 text-gray-800" : "text-gray-600 hover:bg-gray-100"}`}
-                    title="List view"
+                    onClick={() => handleMultipleSelect()}
+                    className={`p-2 rounded-full ${multipleSelect === true ? "bg-gray-200 text-gray-800" : "text-gray-600 hover:bg-gray-100"}`}
+                    title="Multiple select"
                   >
-                    <List className="h-5 w-5" />
+                    <Pencil className="h-5 w-5" />
                   </button>
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={`p-2 rounded-full ${viewMode === "grid" ? "bg-gray-200 text-gray-800" : "text-gray-600 hover:bg-gray-100"}`}
-                    title="Grid view"
-                  >
-                    <Grid className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSortBy("name");
-                      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                    }}
-                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-full"
-                    title="Sort by name"
-                  >
-                    <Info className="h-5 w-5" />
-                  </button>
+                  <div className="flex items-center">
+                    <div className="flex rounded-full border border-gray-400 p-1 bg-white">
+                      <button
+                        onClick={() => setViewMode("list")}
+                        className={`p-2 rounded-full flex items-center justify-center transition-colors ${viewMode === "list" ? "bg-fore-1 text-fore-3" : "text-gray-600"
+                          }`}
+                        title="List view"
+                      >
+                        <List className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode("grid")}
+                        className={`p-2 rounded-full flex items-center justify-center transition-colors ${viewMode === "grid" ? "bg-fore-1 text-fore-3" : "text-gray-600"
+                          }`}
+                        title="Grid view"
+                      >
+                        <Grid className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    {/* Keep the sort button separate */}
+                    <button
+                      onClick={() => {
+                        setSortBy("name");
+                        setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      }}
+                      className="p-2 ml-2 text-gray-600 hover:bg-gray-100 rounded-full"
+                      title="Sort by name"
+                    >
+                      <Info className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Breadcrumb navigation */}
-          {folderPath.length > 0 && (
-            <nav className="flex pb-4 pl-5 text-sm overflow-x-auto py-1 bg-white">
-              <p className="text-gray-500 cursor-not-allowed select-none">{"Cloud /"}&nbsp;</p>
-              <ol className="flex items-center space-x-1">
-                {folderPath.map((folder, index) => (
-                  <li key={folder.id} className="flex items-center whitespace-nowrap">
-                    {index > 0 && <span className="mx-1 text-gray-300">/</span>}
-                    <button
-                      onClick={() => navigateToFolder(folder.id)}
-                      className={`hover:text-[#1a73e8] transition-colors ${index === folderPath.length - 1
-                        ? "font-medium text-[#1a73e8]"
-                        : "text-gray-500"
-                        }`}
-                    >
-                      {folder.name}
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            </nav>
-          )}
 
-          <div className="bg-white h-full">
+          <nav className="flex pb-4 pl-5 text-sm overflow-x-auto py-1 bg-white">
+            <p className="text-gray-500 cursor-not-allowed select-none">{"Cloud"}&nbsp;&nbsp;</p> <p className="text-gray-300 cursor-not-allowed select-none">{"/"}&nbsp;</p>
+            <ol className="flex items-center space-x-1">
+              {folderPath.map((folder, index) => (
+                <li key={folder.id} className="flex items-center whitespace-nowrap">
+                  {index > 0 && <span className="mx-1 text-gray-300">/</span>}
+                  <button
+                    onClick={() => navigateToFolder(folder.id)}
+                    className={`hover:text-[#1a73e8] transition-colors ${index === folderPath.length - 1
+                      ? "font-medium text-[#1a73e8]"
+                      : "text-gray-500"
+                      }`}
+                  >
+                    {folder.name}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </nav>
+
+
+          <div className="bg-white min-h-[calc(100vh-344.5px)] max-h-[calc(100vh-344.5px)] h-[calc(100vh-344.5px)]">
             {showDrive ? (
-            loadingFiles ? (
-              <div className="text-center py-16">
-                <motion.div
-                  className="w-10 h-10 border-4 border-gray-200 border-t-[#1a73e8] rounded-full mx-auto mb-4"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                />
-                <p className="text-gray-500">Loading files...</p>
-              </div>
-            ) : filteredFiles.length > 0 ? (
-              viewMode === "list" ? (
-                // List view
-                <div className="bg-white overflow-hidden pl-4">
+              loadingFiles ? (
+                <div className="bg-white min-h-[calc(100vh-182px)] h-full overflow-y-auto pl-4">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-white">
+                    <thead className="bg-white font-product-sans sticky top-0 z-10">
                       <tr>
-                        <th className="w-10 px-3 py-2">
-                          <input
-                          type="checkbox"
-                          checked={selectedItems.length === filteredFiles.length && filteredFiles.length > 0}
-                          onChange={toggleSelectAll}
-                          className="h-4 w-4 text-[#1a73e8] focus:ring-[#1a73e8]"
-                          />
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
                         </th>
-                        <th
-                          scope="col"
-                          className="px-3 py-3 text-left !min-w-[100px] !max-w-[100px] text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                          onClick={() => {
-                            setSortBy("name");
-                            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                          }}
-                        >
-                          <div className="flex items-center">
-                            Name
-                            {sortBy === "name" && (
-                              <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${sortOrder === "desc" ? "transform rotate-180" : ""}`} />
-                            )}
-                          </div>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Last modified
                         </th>
-                        <th
-                          scope="col"
-                          className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                          onClick={() => {
-                            setSortBy("modified");
-                            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                          }}
-                        >
-                          <div className="flex items-center">
-                            Last modified
-                            {sortBy === "modified" && (
-                              <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${sortOrder === "desc" ? "transform rotate-180" : ""}`} />
-                            )}
-                          </div>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          File size
                         </th>
-                        <th
-                          scope="col"
-                          className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                          onClick={() => {
-                            setSortBy("size");
-                            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                          }}
-                        >
-                          <div className="flex items-center">
-                            File size
-                            {sortBy === "size" && (
-                              <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${sortOrder === "desc" ? "transform rotate-180" : ""}`} />
-                            )}
-                          </div>
-                        </th>
-                        <th scope="col" className="relative px-3 py-3">
+                        <th className="relative px-3 py-3">
                           <span className="sr-only">Actions</span>
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredFiles.map((file) => (
-                        <motion.tr
-                          key={file.id}
-                          className="hover:bg-gray-50 transition-colors cursor-pointer"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.3 }}
-                          onDoubleClick={() => file.mimeType.includes('folder') ? navigateToFolder(file.id) : handleFileAction(file)}
-                        >
-                          <td className="px-3 py-1.5 whitespace-nowrap">
-                            <input
-                              type="checkbox"
-                              checked={selectedItems.includes(file.id)}
-                              onChange={() => toggleItemSelection(file.id)}
-                              className="h-4 w-4 rounded text-[#1a73e8] focus:ring-[#1a73e8]"
-                            />
+                    <tbody className="bg-white font-google-sans">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <tr key={index} className="animate-pulse">
+                          <td className="px-3 py-3">
+                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                           </td>
-                          <td className="!min-w-[100px] !tracking-wide !max-w-[500px] px-3 py-1.5 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <span className="text-lg mr-3 ">{getFileIcon(file.mimeType)}</span>
-                              {file.mimeType.includes('folder') ? (
-                                <button
-                                  onClick={() => navigateToFolder(file.id)}
-                                  className="text-sm text-ellipsis text-gray-900 hover:text-[#1a73e8] hover:underline font-medium"
-                                >
-                                  {file.name}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleFileAction(file)}
-                                  className="text-sm text-ellipsis text-gray-900 hover:text-[#1a73e8] hover:underline"
-                                >
-                                  {file.name}
-                                </button>
-                              )}
-                            </div>
+                          <td className="px-3 py-3">
+                            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
                           </td>
-
-                          <td className="px-3 py-1.5 max-w-[80px] whitespace-nowrap text-sm text-gray-500">
-                            {file.modifiedTime ? formatDate(file.modifiedTime) : "-"}
+                          <td className="px-3 py-3">
+                            <div className="h-4 bg-gray-200 rounded w-1/4"></div>
                           </td>
-                          <td className="px-3 py-1.5 whitespace-nowrap text-sm text-gray-500">
-                            {file.size ? formatFileSize(parseInt(file.size)) : '-'}
+                          <td className="px-3 py-3 flex space-x-2">
+                            <div className="h-4 w-4 bg-gray-200 rounded"></div>
+                            <div className="h-4 w-4 bg-gray-200 rounded"></div>
                           </td>
-                          <td className="px-3 py-1.5 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex space-x-1">
-                              <button
-                                onClick={() => handleDelete(file.id, file.name, file.mimeType)}
-                                className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
-                                title="Delete"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => handleMove(file.id, file.name, file.mimeType)}
-                                className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
-                                title="Move"
-                              >
-                                <ArrowUpRight className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </motion.tr>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                // Grid view
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                  {filteredFiles.map((file) => (
-                    <motion.div
-                      key={file.id}
-                      className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className="relative">
-                        <div className="absolute top-2 left-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedItems.includes(file.id)}
-                            onChange={() => toggleItemSelection(file.id)}
-                          />
-                        </div>
-                        <div className="h-32 flex items-center justify-center bg-gray-50 border-b">
-                          <span className="text-4xl">{getFileIcon(file.mimeType)}</span>
-                        </div>
-                      </div>
-                      <div className="p-3">
-                        <div className="mb-1">
-                          {file.mimeType.includes('folder') ? (
-                            <button
-                              onClick={() => navigateToFolder(file.id)}
-                              className="text-sm text-gray-900 hover:text-[#1a73e8] hover:underline font-medium truncate block w-full text-left"
-                            >
-                              {file.name}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleFileAction(file)}
-                              className="text-sm text-gray-900 hover:text-[#1a73e8] hover:underline truncate block w-full text-left"
-                            >
-                              {file.name}
-                            </button>
+              ) : filteredFiles.length > 0 ? (
+                viewMode === "list" ? (
+                  // List view
+                  <div className="bg-white min-h-[calc(100vh-182px)] h-full overflow-y-auto pl-4">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-white font-product-sans sticky top-0 z-10">
+                        <tr>
+                          {multipleSelect && (
+                            <th className="w-10 px-3 py-2">
+                              <input
+                                type="checkbox"
+                                checked={selectedItems.length === filteredFiles.length && filteredFiles.length > 0}
+                                onChange={toggleSelectAll}
+                                className="h-4 w-4 text-[#1a73e8] focus:ring-[#1a73e8]"
+                              />
+                            </th>
                           )}
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="text-xs text-gray-500">
-                            {file.modifiedTime ? formatDate(file.modifiedTime) : "-"}
-                          </div>
-                          <div className="flex space-x-1">
-                            {currentView === "trash" ? (
-                              <button
-                                onClick={() => handleRestoreFromTrash(file.id)}
-                                className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
-                                title="Restore from trash"
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="16"
-                                  height="16"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <path d="M3 12h18"></path>
-                                  <path d="M12 3v18"></path>
-                                </svg>
-                              </button>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => handleToggleStar(file.id, !file.starred)}
-                                  className={`p-1 rounded-full hover:bg-gray-100 ${file.starred ? 'text-yellow-400' : 'text-gray-500'}`}
-                                  title={file.starred ? "Remove from starred" : "Add to starred"}
-                                >
-                                  <Star className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleMoveToTrash(file.id)}
-                                  className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
-                                  title="Move to trash"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                          <th
+                            scope="col"
+                            className="px-3 py-3 text-left !min-w-[100px] !max-w-[100px] text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                            onClick={() => {
+                              setSortBy("name");
+                              setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                            }}
+                          >
+                            <div className="flex items-center">
+                              Name
+                              {sortBy === "name" && (
+                                <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${sortOrder === "desc" ? "transform rotate-180" : ""}`} />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                            onClick={() => {
+                              setSortBy("modified");
+                              setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                            }}
+                          >
+                            <div className="flex items-center">
+                              Last modified
+                              {sortBy === "modified" && (
+                                <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${sortOrder === "desc" ? "transform rotate-180" : ""}`} />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                            onClick={() => {
+                              setSortBy("size");
+                              setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                            }}
+                          >
+                            <div className="flex items-center">
+                              File size
+                              {sortBy === "size" && (
+                                <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${sortOrder === "desc" ? "transform rotate-180" : ""}`} />
+                              )}
+                            </div>
+                          </th>
+                          <th scope="col" className="relative px-3 py-3">
+                            <span className="sr-only">Actions</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white font-google-sans divide-y divide-gray-400">
+                        {filteredFiles.map((file) => (
+                          <motion.tr
+                            key={file.id}
+                            className="hover:bg-gray-50 transition-colors cursor-pointer"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.3 }}
+                            onDoubleClick={() => file.mimeType.includes('folder') ? navigateToFolder(file.id) : handleFileAction(file)}
+                          >
+                            {multipleSelect && (
+                              <td className="px-3 py-1.5 whitespace-nowrap">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedItems.includes(file.id)}
+                                  onChange={() => toggleItemSelection(file.id)}
+                                  className="h-4 w-4 rounded text-[#1a73e8] focus:ring-[#1a73e8]"
+                                />
+                              </td>
+                            )}
+                            <td className="!min-w-[100px] !tracking-wide !max-w-[500px] px-3 py-1.5 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <span className="text-lg mr-3 ">{getFileIcon(file.mimeType)}</span>
+                                {file.mimeType.includes('folder') ? (
+                                  <button
+                                    onClick={() => navigateToFolder(file.id)}
+                                    className="text-sm text-ellipsis text-gray-900 hover:text-[#1a73e8] hover:underline font-medium"
+                                  >
+                                    {file.name}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleFileAction(file)}
+                                    className="text-sm text-ellipsis text-gray-900 hover:text-[#1a73e8] hover:underline"
+                                  >
+                                    {file.name}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="px-3 py-1.5 max-w-[80px] whitespace-nowrap text-sm text-gray-500">
+                              {file.modifiedTime ? formatDate(file.modifiedTime) : "-"}
+                            </td>
+                            <td className="px-3 py-1.5 whitespace-nowrap text-sm text-gray-500">
+                              {file.size ? formatFileSize(parseInt(file.size)) : '-'}
+                            </td>
+                            <td className="px-3 py-1.5 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex space-x-1">
+                                {multipleSelect && (
+                                  <button
+                                    onClick={() =>
+                                      currentView === "trash"
+                                        ? handleDelete(file.id, file.name, file.mimeType)
+                                        : handleMoveToTrash(file.id)
+                                    }
+                                    className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
+                                
                                 <button
                                   onClick={() => handleMove(file.id, file.name, file.mimeType)}
                                   className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
@@ -2004,125 +1981,218 @@ export default function HomePage() {
                                 >
                                   <ArrowUpRight className="h-4 w-4" />
                                 </button>
-                              </>
-                            )}
+                              </div>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  // Grid view
+                  <div className="overflow-y-auto bg-white min-h-[calc(100vh-185px)] h-full">
+                    <div className=" grid grid-cols-1 sm:grid-cols-2 px-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {filteredFiles.map((file) => (
+                        <motion.div
+                          key={file.id}
+                          className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow max-h-[200px]"
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <div className="relative">
+                            <div className="absolute top-2 left-2">
+                              <input
+                                type="checkbox"
+                                checked={selectedItems.includes(file.id)}
+                                onChange={() => toggleItemSelection(file.id)}
+                              />
+                            </div>
+                            <div className="h-32 flex items-center justify-center bg-gray-50 border-b">
+                              <span className="text-4xl">{getFileIcon(file.mimeType)}</span>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                          <div className="p-3">
+                            <div className="mb-1">
+                              {file.mimeType.includes('folder') ? (
+                                <button
+                                  onClick={() => navigateToFolder(file.id)}
+                                  className="text-sm text-gray-900 hover:text-[#1a73e8] hover:underline font-medium truncate block w-full text-left"
+                                >
+                                  {file.name}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleFileAction(file)}
+                                  className="text-sm text-gray-900 hover:text-[#1a73e8] hover:underline truncate block w-full text-left"
+                                >
+                                  {file.name}
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <div className="text-xs text-gray-500">
+                                {file.modifiedTime ? formatDate(file.modifiedTime) : "-"}
+                              </div>
+                              <div className="flex space-x-1">
+                                {currentView === "trash" ? (
+                                  <button
+                                    onClick={() => handleRestoreFromTrash(file.id)}
+                                    className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                                    title="Restore from trash"
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M3 12h18"></path>
+                                      <path d="M12 3v18"></path>
+                                    </svg>
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleToggleStar(file.id, !file.starred)}
+                                      className={`p-1 rounded-full hover:bg-gray-100 ${file.starred ? 'text-yellow-400' : 'text-gray-500'}`}
+                                      title={file.starred ? "Remove from starred" : "Add to starred"}
+                                    >
+                                      <Star className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleMoveToTrash(file.id)}
+                                      className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                                      title="Move to trash"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleMove(file.id, file.name, file.mimeType)}
+                                      className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                                      title="Move"
+                                    >
+                                      <ArrowUpRight className="h-4 w-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="text-center py-16 bg-white min-h-[calc(100vh-185px)] h-full">
+                  <motion.svg
+                    width="64"
+                    height="64"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="mx-auto mb-4 text-gray-300"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <path d="M20 6H12L10 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.9 21.1 6 20 6ZM20 18H4V6H9.17L11.17 8H20V18ZM14.08 10.62L17.15 13.69L14.08 16.76L12.67 15.34L14.36 13.69L12.66 12.04L14.08 10.62ZM6.92 16.76L9.99 13.69L6.92 10.62L8.34 12.04L10.03 13.69L8.33 15.34L6.92 16.76Z" fill="currentColor" />
+                  </motion.svg>
+                  <p className="text-gray-500">
+                    {searchQuery.trim()
+                      ? "No files/folders found matching your search"
+                      : "This folder is empty"}
+                  </p>
                 </div>
               )
             ) : (
-              <div className="text-center py-16 bg-white rounded-xl shadow-sm">
+              <div className="text-center py-16 bg-white min-h-[calc(100vh-185px)] h-full">
                 <motion.svg
                   width="64"
                   height="64"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="mx-auto mb-4 text-gray-300"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  viewBox="0 0 87.3 78"
+                  className="w-16 h-16 mx-auto mb-4 text-gray-300"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <path d="M20 6H12L10 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.9 21.1 6 20 6ZM20 18H4V6H9.17L11.17 8H20V18ZM14.08 10.62L17.15 13.69L14.08 16.76L12.67 15.34L14.36 13.69L12.66 12.04L14.08 10.62ZM6.92 16.76L9.99 13.69L6.92 10.62L8.34 12.04L10.03 13.69L8.33 15.34L6.92 16.76Z" fill="currentColor" />
+                  <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" />
+                  <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47" />
+                  <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" />
+                  <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d" />
+                  <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc" />
+                  <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" />
                 </motion.svg>
-                <p className="text-gray-500">
-                  {searchQuery.trim()
-                    ? "No files found matching your search"
-                    : "No files found in this folder"}
-                </p>
-                <button
-                  onClick={handleCreateFolder}
-                  className="mt-4 px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1565c0] focus:outline-none transition-colors"
+                <h3 className="text-xl font-medium text-gray-700 mb-2">Welcome to Google Drive</h3>
+                <p className="text-gray-500 mb-6">Store, share, and collaborate on files and folders from any mobile device, tablet, or computer</p>
+                <motion.button
+                  onClick={() => handleListDrive()}
+                  className="px-5 py-2.5 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1565c0] focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:ring-offset-2 shadow-sm hover:shadow-md transition-all"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  Create folder
-                </button>
+                  View My Files
+                </motion.button>
               </div>
-            )
-          ) : (
-            <div className="text-center py-16 bg-white rounded-xl shadow-sm">
-              <motion.svg
-                width="64"
-                height="64"
-                viewBox="0 0 87.3 78"
-                className="w-16 h-16 mx-auto mb-4 text-gray-300"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5 }}
-              >
-                <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" />
-                <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47" />
-                <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" />
-                <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d" />
-                <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc" />
-                <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" />
-              </motion.svg>
-              <h3 className="text-xl font-medium text-gray-700 mb-2">Welcome to Google Drive</h3>
-              <p className="text-gray-500 mb-6">Store, share, and collaborate on files and folders from any mobile device, tablet, or computer</p>
-              <motion.button
-                onClick={() => handleListDrive()}
-                className="px-5 py-2.5 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1565c0] focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:ring-offset-2 shadow-sm hover:shadow-md transition-all"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                View My Files
-              </motion.button>
-            </div>
-          )}
+            )}
 
-          {/* Storage view */}
-          {currentView === "storage" && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Storage Details</h3>
+            {/* Storage view */}
+            {currentView === "storage" && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Storage Details</h3>
 
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="text-sm font-medium">Storage used</div>
-                  <div className="text-sm">{formatFileSize(storageQuota.usage)} of {formatFileSize(storageQuota.limit)}</div>
-                </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="bg-[#1a73e8] h-full"
-                    style={{
-                      width: `${storageQuota.limit ? (storageQuota.usage / storageQuota.limit) * 100 : 0}%`
-                    }}
-                  ></div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center">
-                    <Database className="h-5 w-5 text-gray-500 mr-3" />
-                    <span className="text-sm font-medium">My Drive storage</span>
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="text-sm font-medium">Storage used</div>
+                    <div className="text-sm">{formatFileSize(storageQuota.usage)} of {formatFileSize(storageQuota.limit)}</div>
                   </div>
-                  <div className="text-sm text-gray-500">{formatFileSize(storageQuota.usageInDrive)}</div>
-                </div>
-
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center">
-                    <Trash2 className="h-5 w-5 text-gray-500 mr-3" />
-                    <span className="text-sm font-medium">Trash</span>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="bg-[#1a73e8] h-full"
+                      style={{
+                        width: `${storageQuota.limit ? (storageQuota.usage / storageQuota.limit) * 100 : 0}%`
+                      }}
+                    ></div>
                   </div>
-                  <div className="text-sm text-gray-500">{formatFileSize(storageQuota.usageInDriveTrash)}</div>
                 </div>
 
-                <div className="mt-6">
-                  <a
-                    href="https://one.google.com/storage"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1565c0] transition-colors"
-                  >
-                    <span>Buy more storage</span>
-                    <ArrowUpRight className="h-4 w-4 ml-2" />
-                  </a>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center">
+                      <Database className="h-5 w-5 text-gray-500 mr-3" />
+                      <span className="text-sm font-medium">My Drive storage</span>
+                    </div>
+                    <div className="text-sm text-gray-500">{formatFileSize(storageQuota.usageInDrive)}</div>
+                  </div>
+
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center">
+                      <Trash2 className="h-5 w-5 text-gray-500 mr-3" />
+                      <span className="text-sm font-medium">Trash</span>
+                    </div>
+                    <div className="text-sm text-gray-500">{formatFileSize(storageQuota.usageInDriveTrash)}</div>
+                  </div>
+
+                  <div className="mt-6">
+                    <a
+                      href="https://one.google.com/storage"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center px-4 py-2 bg-[#1a73e8] text-white rounded-lg text-sm font-medium hover:bg-[#1565c0] transition-colors"
+                    >
+                      <span>Buy more storage</span>
+                      <ArrowUpRight className="h-4 w-4 ml-2" />
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
           </div>
         </main>
       </div>

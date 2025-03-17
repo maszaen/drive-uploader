@@ -11,7 +11,7 @@ const authOptions = {
       },
       async authorize(credentials) {
         if (credentials?.password === process.env.ADMIN_PASSWORD) {
-          return { id: "admin", name: "Admin" };
+          return { id: "zaeniahmad", name: "Zaeni Ahmad", email: "exqeon@gmail.com"};
         }
         return null;
       }
@@ -19,7 +19,7 @@ const authOptions = {
   ],
   session: {
     strategy: "jwt" as const,
-    maxAge: 60 * 60 // 1 jam
+    maxAge: 60 * 60
   },
   secret: process.env.NEXTAUTH_SECRET
 };
