@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   AppWindow,
   ArrowUpRight,
+  Check,
   ChevronDown,
   Clock,
   Database,
@@ -24,6 +25,7 @@ import {
   Star,
   Trash2,
   Upload,
+  X
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -126,10 +128,18 @@ export default function HomePage() {
   const [totalFiles, setTotalFiles] = useState<number>(0);
   const [showUploadStatus, setShowUploadStatus] = useState<boolean>(false);
   const [isPasting, setIsPasting] = useState(false);
+  const [uploadFailed, setUploadFailed] = useState(false);
   const [pasteTimeout, setPasteTimeout] = useState(null);
   const pasteOperationIdRef = useRef(0);
   const [pasteOperationLock, setPasteOperationLock] = useState(false);
   const lastOperationTimestamp = useRef(0);
+
+  const [showRenameModal, setShowRenameModal] = useState<boolean>(false);
+  const [itemToRename, setItemToRename] = useState<FileItem | null>(null);
+  const [newName, setNewName] = useState<string>("");
+  const [isRenaming, setIsRenaming] = useState<boolean>(false);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
 
   interface PreviewSupport {
     canPreview: boolean;
@@ -198,6 +208,10 @@ export default function HomePage() {
       setUploadMessage("Failed to copy share link");
     }
   };
+
+  const clearUploadMessage = () => {
+    setUploadMessage("");
+  }
 
   const handleStopSharing = async (fileId: string, name: string) => {
     try {
@@ -412,6 +426,120 @@ export default function HomePage() {
     } finally {
       setLoadingFiles(false);
     }
+  };
+
+  const handleRename = (file: FileItem) => {
+    setItemToRename(file);
+    setNewName(file.name);
+    setShowRenameModal(true);
+  };
+
+  const executeRename = async () => {
+    if (!itemToRename || !newName.trim() || newName === itemToRename.name) {
+      setShowRenameModal(false);
+      return;
+    }
+
+    setIsRenaming(true);
+
+    try {
+      const res = await fetch("/api/rename", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileId: itemToRename.id,
+          newName: newName.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setUploadMessage(`Renamed to "${newName}" successfully`);
+
+        // Refresh file list
+        if (currentView === "myDrive") {
+          handleListDrive(currentFolderId);
+        } else if (currentView === "recent") {
+          handleLoadRecent();
+        } else if (currentView === "starred") {
+          handleLoadStarred();
+        } else if (currentView === "shared") {
+          handleLoadShared();
+        }
+      } else {
+        setUploadMessage(data.message || "Failed to rename file");
+      }
+    } catch (error) {
+      setUploadMessage("Failed to rename file. Please try again.");
+    } finally {
+      setIsRenaming(false);
+      setShowRenameModal(false);
+      setItemToRename(null);
+    }
+  };
+
+  // 3. Tambahkan effect hook untuk focus input saat modal terbuka
+  useEffect(() => {
+    if (showRenameModal && renameInputRef.current) {
+      setTimeout(() => {
+        if (renameInputRef.current) {
+          renameInputRef.current.focus();
+          renameInputRef.current.select();
+        }
+      }, 50);
+    }
+  }, [showRenameModal]);
+
+  // 4. Tambahkan komponen RenameModal
+  const RenameModal = () => {
+    if (!showRenameModal || !itemToRename) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-30 bg-black/30 z-9999 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-xl p-4 px-6 pt-5 w-full max-w-md mx-4">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Rename {itemToRename.mimeType?.includes("folder") ? "Folder" : "File"}
+          </h3>
+          <div className="mb-6">
+            <input
+              type="text"
+              ref={renameInputRef}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  executeRename();
+                }
+              }}
+              className="w-full border border-gray-300 text-black rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="Enter new name"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => setShowRenameModal(false)}
+              className="px-4 py-2 rounded-full hover:bg-base text-primary text-sm font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={executeRename}
+              disabled={!newName.trim() || newName === itemToRename.name || isRenaming}
+              className={`px-4 py-2 ${!newName.trim() || newName === itemToRename.name || isRenaming
+                  ? "!text-black/50 cursor-default"
+                  : "hover:bg-base !rounded-full !text-primary"
+                } text-sm font-medium transition-colors`}
+            >
+              {isRenaming ? "Renaming..." : "Rename"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const handleToggleStar = async (fileId: string, starred: boolean) => {
@@ -679,9 +807,7 @@ export default function HomePage() {
   };
 
   const executeUpload = async (files: FileList) => {
-
     if (!files || files.length === 0) {
-
       return;
     }
 
@@ -699,53 +825,63 @@ export default function HomePage() {
     setUploading(true);
     setUploadProgress(0);
     setUploadMessage("");
+    setCurrentUploadFile(files[0]?.name || "");
 
     const formData = new FormData();
+    const relativePaths: string[] = [];
+
     for (let i = 0; i < files.length; i++) {
       formData.append("files", files[i]);
 
       const file = files[i] as any;
       if (file.webkitRelativePath) {
-;
-        formData.append("relativePaths", file.webkitRelativePath || "");
+        relativePaths.push(file.webkitRelativePath);
+        formData.append("relativePaths", file.webkitRelativePath);
+      } else {
+        formData.append("relativePaths", "");
       }
     }
 
     formData.append("uploadMode", uploadMode);
+    formData.append("replaceExisting", "false"); // Default: jangan replace file yang sudah ada
 
     if (currentFolderId) {
       formData.append("folderId", currentFolderId);
     }
 
+    const simulateUploadProgress = () => {
+      let currentProgress = 0;
+      let currentFileIndex = 0;
+
+      const interval = setInterval(() => {
+        if (currentProgress >= 100) {
+          clearInterval(interval);
+          return;
+        }
+
+        const increment = Math.random() * 3 + 0.5;
+        currentProgress += increment;
+
+        if (currentProgress > 100) currentProgress = 100;
+
+        setUploadProgress(currentProgress);
+        setUploadedSize(Math.min(totalSize * (currentProgress / 100), totalSize));
+
+        if (files &&
+          currentProgress > (currentFileIndex + 1) * (100 / files.length) &&
+          currentFileIndex < files.length - 1) {
+          currentFileIndex++;
+          setCurrentUploadFile(files[currentFileIndex].name);
+          setUploadedFiles(currentFileIndex + 1);
+        }
+      }, 250);
+
+      return interval;
+    };
+
+    const progressInterval = simulateUploadProgress();
+
     try {
-
-      const simulateUploadProgress = () => {
-        let currentProgress = 0;
-        const interval = setInterval(() => {
-          if (currentProgress >= 100) {
-            clearInterval(interval);
-            return;
-          }
-
-          currentProgress += Math.random() * 5;
-          if (currentProgress > 100) currentProgress = 100;
-
-          setUploadProgress(currentProgress);
-          setUploadedSize(totalSize * (currentProgress / 100));
-
-          if (files && currentProgress % 20 < 1 && uploadedFiles < totalFiles) {
-            const nextFileIndex = uploadedFiles;
-            if (files[nextFileIndex]) {
-              setCurrentUploadFile(files[nextFileIndex].name);
-              setUploadedFiles((prev) => Math.min(prev + 1, files.length));
-            }
-          }
-        }, 300);
-        return interval;
-      };
-
-      const progressInterval = simulateUploadProgress();
-
       const res = await fetch("/api/upload", {
         method: "POST",
         body: formData,
@@ -754,16 +890,21 @@ export default function HomePage() {
       clearInterval(progressInterval);
       setUploadProgress(100);
       setUploadedSize(totalSize);
-      setUploadedFiles(totalFiles);
+      setUploadedFiles(files.length);
 
       const data = await res.json();
 
-      if (!res.ok) {
-
-        setUploadMessage(data.message || "Upload failed.");
+      if (!data.uploadedFiles) {
+        setUploadMessage(data.message || "Error uploading.");
       } else {
+        let successMsg = `Successfully uploaded ${data.uploadedFiles} of ${data.totalFiles} files`;
 
-        setUploadMessage(data.message || "Upload successful");
+        // Tampilkan info detail jika ada
+        if (data.replacedFiles && data.replacedFiles > 0) {
+          successMsg += ` (${data.replacedFiles} replaced, ${data.newFiles} new)`;
+        }
+
+        setUploadMessage(successMsg);
 
         if (fileInputRef.current) fileInputRef.current.value = "";
         if (folderInputRef.current) folderInputRef.current.value = "";
@@ -772,28 +913,22 @@ export default function HomePage() {
 
         setTimeout(() => {
           setShowUploadStatus(false);
-          setSelectedFiles(null);
-        }, 1500);
+        }, 3000);
       }
     } catch (error) {
-
-      setUploadMessage("Upload failed. Please try again.");
+      clearInterval(progressInterval);
+      setUploadMessage("Error uploading. Please try again.");
     } finally {
-
       setTimeout(() => {
         setUploading(false);
-        if (!showUploadStatus) setUploadProgress(0);
       }, 1000);
     }
   };
 
   const triggerFileInput = (mode: UploadModes) => {
-
     if (mode === "file" && fileInputRef.current) {
-
       fileInputRef.current.click();
     } else if (mode === "folder" && folderInputRef.current) {
-
       folderInputRef.current.click();
     }
   };
@@ -968,9 +1103,9 @@ export default function HomePage() {
               successCount++;
             }
           } catch (error) {
-    // Silently catch the error
-    // console.error(error);
-}
+            // Silently catch the error
+            // console.error(error);
+          }
         }
 
         if (successCount > 0) {
@@ -1027,9 +1162,9 @@ export default function HomePage() {
       setAvailableFolders(folders);
       setShowModal(true);
     } catch (error) {
-    // Silently catch the error
-    // console.error(error);
-}
+      // Silently catch the error
+      // console.error(error);
+    }
   };
 
   const confirmMove = async () => {
@@ -1346,7 +1481,7 @@ export default function HomePage() {
 
         const targetFolderId = currentFolderId || "root";
 
-;
+        ;
 
         const res = await fetch("/api/copy", {
           method: "POST",
@@ -1467,6 +1602,66 @@ export default function HomePage() {
         .replace(/\s/g, "–");
     }
   };
+
+  //   const UploadOptionModal = () => {
+  //   if (!showUploadModal) return null;
+
+  //   return (
+  //     <div className="fixed inset-0 bg-black bg-opacity-30 bg-black/30 z-9999 flex items-center justify-center">
+  //       <div className="bg-white rounded-xl shadow-xl p-4 px-6 pt-5 w-full max-w-md mx-4">
+  //         <h3 className="text-lg font-medium text-gray-900 mb-2">Upload Options</h3>
+  //         <p className="text-gray-700 mb-4">
+  //           Some files or folders might already exist. How would you like to proceed?
+  //         </p>
+
+  //         <div className="mb-6">
+  //           <div className="flex items-center mb-3">
+  //             <input
+  //               type="radio"
+  //               id="create-new"
+  //               name="upload-option"
+  //               checked={!replaceExisting}
+  //               onChange={() => setReplaceExisting(false)}
+  //               className="mr-2"
+  //             />
+  //             <label htmlFor="create-new" className="text-sm">
+  //               <span className="font-medium">Create new copy</span> - Keep existing files and upload new ones
+  //             </label>
+  //           </div>
+
+  //           <div className="flex items-center">
+  //             <input
+  //               type="radio"
+  //               id="replace"
+  //               name="upload-option"
+  //               checked={replaceExisting}
+  //               onChange={() => setReplaceExisting(true)}
+  //               className="mr-2"
+  //             />
+  //             <label htmlFor="replace" className="text-sm">
+  //               <span className="font-medium">Replace existing</span> - Overwrite files with the same name
+  //             </label>
+  //           </div>
+  //         </div>
+
+  //         <div className="flex justify-end space-x-3">
+  //           <button
+  //             onClick={() => setShowUploadModal(false)}
+  //             className="px-4 py-2 rounded-full hover:bg-base text-primary text-sm font-medium transition-colors"
+  //           >
+  //             Cancel
+  //           </button>
+  //           <button
+  //             onClick={() => proceedWithUpload(replaceExisting)}
+  //             className="px-4 py-2 bg-[#1a73e8] hover:bg-[#1565c0] text-white rounded-full text-sm font-medium transition-colors"
+  //           >
+  //             Upload
+  //           </button>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // };
 
   const PreviewModal = () => {
     if (!showPreview || !previewFile) return null;
@@ -2108,13 +2303,13 @@ export default function HomePage() {
           <AnimatePresence>
             {showUploadStatus && (
               <motion.div
-                className="fixed bottom-6 right-6 z-50 bg-white rounded-lg shadow-lg overflow-hidden w-80"
+                className="fixed bottom-6 right-6 z-50 bg-fore rounded-2xl shadow-switch-1 overflow-hidden w-80"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="p-4 border-b border-gray-200">
+                <div className="p-4 border-b border-gray-200 bg-base-1">
                   <div className="flex justify-between items-center">
                     <div className="font-medium text-gray-700">
                       Uploading {totalFiles}{" "}
@@ -2145,35 +2340,38 @@ export default function HomePage() {
                 <div className="p-4">
                   <div className="flex items-center mb-3">
                     <div className="relative mr-4">
-                      <svg className="w-10 h-10" viewBox="0 0 36 36">
-                        <circle
-                          cx="18"
-                          cy="18"
-                          r="16"
-                          fill="none"
-                          stroke="#e0e0e0"
-                          strokeWidth="2"
-                        ></circle>
-                        <circle
-                          cx="18"
-                          cy="18"
-                          r="16"
-                          fill="none"
-                          stroke="#1a73e8"
-                          strokeWidth="2"
-                          strokeDasharray="100"
-                          strokeDashoffset={100 - uploadProgress}
-                          transform="rotate(-90 18 18)"
-                        ></circle>
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center text-xs font-medium">
-                        {Math.round(uploadProgress)}%
-                      </div>
+                      {uploadProgress < 100 ? (
+                        // Progress lingkaran
+                        <div className="relative w-10 h-10">
+                          <svg className="w-10 h-10" viewBox="0 0 36 36">
+                            <circle cx="18" cy="18" r="16" fill="none" stroke="#e0e0e0" strokeWidth="2"></circle>
+                            <circle
+                              cx="18"
+                              cy="18"
+                              r="16"
+                              fill="none"
+                              stroke="#1a73e8"
+                              strokeWidth="2"
+                              strokeDasharray="100"
+                              strokeDashoffset={100 - uploadProgress}
+                              transform="rotate(-90 18 18)"
+                            ></circle>
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-primary">
+                            {Math.round(uploadProgress)}%
+                          </div>
+                        </div>
+                      ) : (
+                        // Circle dengan fill hijau dan checklist di tengah
+                        <div className="relative w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                          <Check className="w-6 h-6 text-white" />
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex-1">
                       <div
-                        className="text-sm font-medium mb-1 truncate"
+                        className="text-sm font-medium mb-1 truncate text-black"
                         title={currentUploadFile}
                       >
                         {currentUploadFile ||
@@ -2214,20 +2412,43 @@ export default function HomePage() {
                       Empty Trash
                     </button>
                   )}
-                  {uploadMessage && (
-                    <motion.div
-                      className={`text-sm font-medium px-3 py-1 rounded-full ${uploadMessage.includes("failed") ||
-                        uploadMessage.includes("Please")
-                        ? "bg-red-50 text-red-500"
-                        : "bg-green-50 text-green-500"
-                        }`}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      {uploadMessage}
-                    </motion.div>
-                  )}
+                  <AnimatePresence>
+  {uploadMessage && (
+    <motion.div
+      key="upload-message"
+      className={`text-sm font-medium items-center flex flex-row px-3 py-1 rounded-full ${
+        uploadMessage.includes("failed") || uploadMessage.includes("Please")
+          ? "bg-red-50 text-red-500"
+          : "bg-green-50 text-green-500"
+      }`}
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ 
+        opacity: 1, 
+        x: 0,
+        transition: {
+          type: "tween",
+          ease: [0.4, 0, 0.2, 1],
+          duration: 0.3
+        }
+      }}
+      exit={{ 
+        opacity: 0, 
+        x: 20,
+        transition: {
+          type: "tween",
+          ease: [0.4, 0, 1, 1], 
+          duration: 0.2
+        }
+      }}
+    >
+      {uploadMessage}
+      <X
+        onClick={() => setUploadMessage("")}
+        className="h-4 w-4 ml-2 cursor-pointer"
+      />
+    </motion.div>
+  )}
+</AnimatePresence>
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -2371,7 +2592,7 @@ export default function HomePage() {
                 viewMode === "list" ? (
 
                   <div className="bg-white min-h-[calc(100vh-182px)] h-full overflow-y-auto pl-4 relative">
-                    {}
+                    { }
                     {selectedItems.length > 0 && (
                       <div
                         className="absolute inset-0 z-0"
@@ -2379,7 +2600,7 @@ export default function HomePage() {
                       ></div>
                     )}
                     <table className="min-w-full divide-y border-collapse z-10 relative !divide-black">
-                      {}
+                      { }
                       <thead className="bg-white font-product-sans sticky top-0 z-10">
                         <tr>
                           {multipleSelect && (
@@ -2470,7 +2691,7 @@ export default function HomePage() {
                           </th>
                         </tr>
                       </thead>
-                      {}
+                      { }
                       <tbody className="bg-white font-google-sans divide-y !divide-black">
                         {filteredFiles.map((file, index) => (
                           <motion.tr
@@ -2538,7 +2759,7 @@ export default function HomePage() {
 
                             {currentView === "shared" && (
                               <td className="px-3 py-1.5 whitespace-nowrap text-sm text-gray-500">
-                                {file.sharedBy || "example@gmail.com"} {}
+                                {file.sharedBy || "example@gmail.com"} { }
                               </td>
                             )}
 
@@ -2569,8 +2790,20 @@ export default function HomePage() {
                                   </button>
                                 )}
 
+
+
                                 {currentView !== "trash" && (
                                   <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRename(file);
+                                      }}
+                                      className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                                      title="Rename"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </button>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -2643,7 +2876,7 @@ export default function HomePage() {
                 ) : (
                   <div className="overflow-y-auto bg-white min-h-[calc(100vh-185px)] h-full">
                     <div className=" grid grid-cols-1 sm:grid-cols-2 px-5 pt-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                      {}
+                      { }
                       {filteredFiles.map((file) => (
                         <motion.div
                           key={file.id}
@@ -2730,6 +2963,13 @@ export default function HomePage() {
                                   </button>
                                 ) : (
                                   <>
+                                    <button
+                                      onClick={() => handleRename(file)}
+                                      className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                                      title="Rename"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </button>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -2953,6 +3193,7 @@ export default function HomePage() {
 
       {showModal && <Modal />}
       {showPreview && <PreviewModal />}
+      {showRenameModal && <RenameModal />}
     </div>
   );
 }
