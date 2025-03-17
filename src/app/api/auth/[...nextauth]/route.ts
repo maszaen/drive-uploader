@@ -10,7 +10,7 @@ const authOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (credentials?.password === process.env.ADMIN_PASSWORD) {
+        if (credentials?.password === process.env.ADMIN_PASSWORD || credentials?.password === process.env.ADMIN_PASSWORD2) {
           return { id: "zaeniahmad", name: "Zaeni Ahmad", email: "exqeon@gmail.com"};
         }
         return null;
