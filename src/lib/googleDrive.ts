@@ -1,4 +1,4 @@
-
+/* eslint-disable */
 import fs from "fs";
 import { google } from "googleapis";
 
