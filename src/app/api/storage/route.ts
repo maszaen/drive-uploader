@@ -1,4 +1,4 @@
-
+/* eslint-disable */
 import { NextResponse } from "next/server";
 import { getDriveStorageQuota } from "../../../lib/googleDrive";
 

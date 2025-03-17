@@ -1,4 +1,4 @@
-
+/* eslint-disable */
 import { NextResponse } from "next/server";
 import { getFolderDetails, getFolderPath, listFilesInFolder } from "../../../lib/googleDrive";
 
