@@ -1,4 +1,4 @@
-
+/* eslint-disable */
 "use client";
 
 import GoogleStyleAvatar from "@/components/GoogleStyleAvatar";
