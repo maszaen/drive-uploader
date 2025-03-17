@@ -1370,16 +1370,27 @@ export default function HomePage() {
               {/* Logo */}
               <div className="flex items-center px-3 pt-3 mr-6 mb-5">
                 <div className="w-9 h-9 flex items-center justify-center mr-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 87.3 78" className="w-9 h-9">
-                    <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" />
-                    <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47" />
-                    <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" />
-                    <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d" />
-                    <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc" />
-                    <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+                    <defs>
+                      <linearGradient id="gradient" className="w-9 h-9" gradientUnits="userSpaceOnUse" x1="57.853" x2="43.1737" y1="12.7873" y2="117.2361">
+                        <stop offset="0" stopColor="#6CA5D9" />
+                        <stop offset="0.34" stopColor="#478ECC" />
+                        <stop offset="0.58" stopColor="#2574BB" />
+                        <stop offset="1" stopColor="#00539E" />
+                      </linearGradient>
+                    </defs>
+                    <path fill-opacity="0.2" fill-rule="evenodd" clip-rule="evenodd" d="M34,79.7l93,4.4c1.2,0.1,1.4,1,0.4,2.1l-27,32.8c-0.9,1.1-2.6,2.1-3.8,1.9L5.5,109.7c-1.1-0.1-1.4-1.1-0.4-2.1l25.2-25.9C31.2,80.6,32.8,79.7,34,79.7z" />
+                    <polygon fill="#6699FF" points="1.6,10 3.6,8 4,7.6 4.5,7.4 4.9,7.1 5.4,7 5.9,6.8 6.4,6.8 7,6.8 7.5,6.8 97.6,18.1 98.1,18.2 98.7,18.4 99.2,18.6 99.7,18.8 100.2,19.1 100.6,19.5 101.1,19.9 101.4,20.3 101.8,20.7 102.1,21.2 102.4,21.7 102.6,22.2 102.8,22.7 102.9,23.3 103,23.8 103.1,24.4 103.1,114.3 103,114.8 102.9,115.4 102.8,115.9 102.6,116.4 102.4,116.9 102.1,117.3 101.8,117.7 99.8,119.7 100.1,119.3 100.4,118.9 100.6,118.4 100.8,117.9 100.9,117.4 101,116.9 101,116.3 101,26.4 101,25.9 100.9,25.3 100.8,24.7 100.6,24.2 100.4,23.7 100.1,23.2 99.8,22.7 99.4,22.3 99,21.9 98.6,21.5 98.2,21.2 97.7,20.9 97.2,20.6 96.6,20.4 96.1,20.3 95.5,20.2 5.5,8.8 4.9,8.8 4.4,8.8 3.9,8.9 3.4,9 2.9,9.2 2.4,9.4 2,9.7" />
+                    <path fill="url(#gradient)" fill-rule="evenodd" clip-rule="evenodd" d="M5.5,8.8l90.1,11.3c3,0.4,5.5,3.2,5.5,6.3v89.9c0,3.1-2.5,5.3-5.5,4.9L5.5,109.9c-3-0.4-5.5-3.2-5.5-6.3V13.7C0,10.7,2.5,8.5,5.5,8.8z" />
+                    <g fill="#FFFFFF">
+                      <polygon points="39.2,76.8 29.1,91.6 28.5,92.4 29.7,92.6 76,99.1 76.4,99.2 76.6,98.9 87.1,83.6" />
+                      <polygon points="63.4,34.2 63.2,33.8 62.8,33.8 42.8,31 41.6,30.9 42.2,32 65.3,74.8 65.5,75.2 65.9,75.2 85.9,78 87.1,78.1 86.5,77" />
+                      <polygon points="48.7,52.3 48.5,52 38.4,33.5 37.8,32.4 37.2,33.3 14.1,69.6 13.9,69.9 14.1,70.3 24.2,88.8 24.8,89.9 25.4,88.9 48.5,52.7" />
+                    </g>
                   </svg>
+
                 </div>
-                <h1 className="text-xl font-product-sans font-normal text-gray-800">Drive</h1>
+                <h1 className="text-xl font-product-sans font-normal text-gray-800">Drivogle</h1>
               </div>
               <button
                 onClick={() => setShowCreateMenu(!showCreateMenu)}
@@ -1973,7 +1984,7 @@ export default function HomePage() {
                                     <Trash2 className="h-4 w-4" />
                                   </button>
                                 )}
-                                
+
                                 <button
                                   onClick={() => handleMove(file.id, file.name, file.mimeType)}
                                   className="p-1 rounded-full hover:bg-gray-100 text-gray-500"

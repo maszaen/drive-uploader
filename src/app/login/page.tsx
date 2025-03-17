@@ -341,12 +341,12 @@ export default function LoginPage() {
             
             <div className="min-h-[286px] flex flex-col items-center justify-center">
               <img 
-                src="/images/google.png" 
+                src="/images/drivogle.png" 
                 alt="Google Logo" 
                 className="mb-6 h-6 min-h-[2.4rem] min-w-[2.4rem]"
               />
               <div className="text-center">
-                <h2 className="text-xl font-medium text-gray-700">Sign in to Google Drive</h2>
+                <h2 className="text-xl font-medium text-gray-700">Sign in to Drivogle</h2>
                 <p className="text-sm text-gray-500 mt-2">Please wait while we set up a secure connection</p>
               </div>
             </div>
@@ -403,7 +403,7 @@ export default function LoginPage() {
           <div className="flex flex-row">
             <div className="mb-6 max-w-sm w-full mr-0 lg:mr-15">
               <img 
-                src="/images/google.png" 
+                src="/images/drivogle.png" 
                 alt="Google Logo" 
                 className="mb-6 h-6 min-h-[2.4rem] min-w-[2.4rem]"
               />

@@ -6,9 +6,9 @@ import "../app/globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Drive Uploader",
-  description: "Upload files to Google Drive",
-};
+  title: "Drivogle - Not Google Drive",
+  description: "Not Google Drive, yet it feels familiar. A new way to store and manage your files."
+}
 
 export default function RootLayout({
   children,
