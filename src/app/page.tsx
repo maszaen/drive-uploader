@@ -1364,7 +1364,7 @@ export default function HomePage() {
       {/* Main content */}
       <div className="flex flex-1">
         {/* Sidebar */}
-        <aside className="w-60 bg-base-1 fixed left-0 top-0 bottom-0 z-10 px-5">
+        <aside className="w-60 bg-base-1 fixed left-0 top-0 bottom-0 z-999 px-5">
           {/* New button */}
           <div>
             <div className="relative" ref={createMenuRef}>
