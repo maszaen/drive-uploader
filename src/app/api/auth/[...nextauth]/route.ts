@@ -1,10 +1,9 @@
+// app/api/auth/[...nextauth]/route.ts
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import type { NextAuthOptions } from 'next-auth'
-import type { JWT } from 'next-auth/jwt'
 import type { Session } from 'next-auth'
 
-// Definisikan interface tambahan untuk User dan Session
 interface ExtendedUser {
   id: string
   name?: string | null
@@ -18,7 +17,6 @@ interface ExtendedSession extends Session {
 
 const API_URL = 'https://drvsrv-891166606972.asia-southeast1.run.app'
 
-// Fungsi sederhana untuk membandingkan password
 const comparePasswords = (
   inputPassword: string,
   storedPassword: string
@@ -32,13 +30,13 @@ export const authOptions: NextAuthOptions = {
       name: 'Password',
       credentials: {
         password: { label: 'Password', type: 'password' },
+        fingerprint: { label: 'Fingerprint', type: 'text' },
       },
       async authorize(credentials, req) {
         if (!credentials?.password) {
           return null
         }
 
-        // Get admin passwords
         const adminPassword = process.env.ADMIN_PASSWORD
         const adminPassword2 = process.env.ADMIN_PASSWORD2
 
@@ -46,31 +44,34 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Admin password not configured')
         }
 
-        // Check password
-        if (
+        const isValid =
           comparePasswords(credentials.password, adminPassword) ||
           (adminPassword2 &&
             comparePasswords(credentials.password, adminPassword2))
-        ) {
-          // Coba kirim ke API untuk reset failed attempts
+
+        if (isValid) {
           try {
             const ip =
               (req.headers?.['x-forwarded-for'] as string) ||
               (req.headers?.['x-real-ip'] as string) ||
               'unknown'
 
+            const fingerprint = credentials.fingerprint || 'unknown'
+
             fetch(`${API_URL}/login-attempt`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ attempts: 0 }),
+              body: JSON.stringify({
+                attempts: 0,
+                fingerprint: fingerprint,
+              }),
             }).catch((err) =>
               console.error('Failed to report successful login:', err)
             )
           } catch (error) {
-            // Lanjutkan meskipun gagal
+            console.error('Error during login attempt:', error)
           }
 
-          // Return objek user dengan properti yang dibutuhkan
           return {
             id: 'zaeniahmad',
             name: 'Zaeni Ahmad',
@@ -79,22 +80,26 @@ export const authOptions: NextAuthOptions = {
           } as ExtendedUser
         }
 
-        // Report failed login
         try {
           const ip =
             (req.headers?.['x-forwarded-for'] as string) ||
             (req.headers?.['x-real-ip'] as string) ||
             'unknown'
 
+          const fingerprint = credentials.fingerprint || 'unknown'
+
           fetch(`${API_URL}/login-attempt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ attempts: 1 }),
+            body: JSON.stringify({
+              attempts: 1,
+              fingerprint: fingerprint,
+            }),
           }).catch((err) =>
             console.error('Failed to report login attempt:', err)
           )
         } catch (error) {
-          // Lanjutkan meskipun gagal
+          console.error('Error during login attempt:', error)
         }
 
         return null
@@ -104,7 +109,6 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        // Pastikan token menyimpan nilai user.id dan user.role
         token.id = user.id
         token.role = (user as ExtendedUser).role
         token.authTime = Date.now()
@@ -112,7 +116,6 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }): Promise<ExtendedSession> {
-      // Buat objek session yang dikembalikan menyertakan id dan role
       return {
         ...session,
         user: {
@@ -125,7 +128,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'jwt',
-    maxAge: 60 * 60, // 1 jam
+    maxAge: 60 * 60,
   },
   pages: {
     signIn: '/login',

@@ -1,11 +1,44 @@
+// middleware.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 const API_URL = 'https://drvsrv-891166606972.asia-southeast1.run.app'
 
+async function isClientBlocked(request: NextRequest) {
+  const clientIp =
+    request.headers.get('x-forwarded-for') ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
+
+  const fingerprint =
+    request.cookies.get('device_fingerprint')?.value || 'unknown'
+
+  try {
+    const blockResponse = await fetch(`${API_URL}/is-blocked`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ip: clientIp,
+        fingerprint: fingerprint,
+      }),
+      cache: 'no-store',
+    })
+
+    if (blockResponse.ok) {
+      const blockData = await blockResponse.json()
+      return blockData.blocked
+    }
+  } catch (error) {
+    console.error('Error checking block status:', error)
+  }
+
+  return false
+}
+
 export async function middleware(request: NextRequest) {
-  // Paths yang tidak memerlukan autentikasi
   const publicPaths = [
     '/login',
     '/_next',
@@ -18,37 +51,17 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(path)
   )
 
-  const clientIp =
-    request.headers.get('x-forwarded-for') ||
-    request.headers.get('x-real-ip') ||
-    'unknown'
-
   if (
     request.nextUrl.pathname.includes('/api/auth/callback/credentials') ||
     request.nextUrl.pathname.includes('/api/auth/signin/credentials')
   ) {
-    try {
-      const blockResponse = await fetch(`${API_URL}/is-blocked`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ ip: clientIp }),
-        cache: 'no-store',
-      })
+    const isBlocked = await isClientBlocked(request)
 
-      if (blockResponse.ok) {
-        const blockData = await blockResponse.json()
-        if (blockData.blocked) {
-          return NextResponse.json(
-            { error: 'Too many login attempts. Please try again later.' },
-            { status: 429 }
-          )
-        }
-      }
-    } catch (error) {
-      console.error('Error checking block status:', error)
-      // Lanjutkan jika API gagal, jangan blokir pengguna
+    if (isBlocked) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429 }
+      )
     }
   }
 
@@ -72,10 +85,10 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Content-Type-Options', 'nosniff')
   response.headers.set('X-Frame-Options', 'DENY')
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  response.headers.set(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'"
+  )
 
   return response
-}
-
-export const config = {
-  matcher: ['/((?!_next/static|_next/image).*)'],
 }

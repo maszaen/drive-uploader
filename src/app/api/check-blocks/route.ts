@@ -5,19 +5,23 @@ const API_URL = 'https://drvsrv-891166606972.asia-southeast1.run.app'
 
 export async function GET(request: NextRequest) {
   try {
-    // Dapatkan IP client
     const clientIp =
       request.headers.get('x-forwarded-for') ||
       request.headers.get('x-real-ip') ||
       'unknown'
 
-    // Periksa dengan API yang sudah ada
+    const fingerprint =
+      request.cookies.get('device_fingerprint')?.value || 'unknown'
+
     const response = await fetch(`${API_URL}/is-blocked`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ip: clientIp }),
+      body: JSON.stringify({
+        ip: clientIp,
+        fingerprint: fingerprint,
+      }),
       cache: 'no-store',
     })
 
@@ -26,13 +30,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ isBlocked: data.blocked })
     }
 
-    // Fallback ke cookie jika API gagal
-    const isBlocked = request.cookies.get('ip_blocked')?.value === 'true'
+    const isBlocked = request.cookies.get('client_blocked')?.value === 'true'
     return NextResponse.json({ isBlocked })
   } catch (error) {
     console.error('Error checking block status:', error)
-    // Fallback ke cookie jika terjadi kesalahan
-    const isBlocked = request.cookies.get('ip_blocked')?.value === 'true'
+    const isBlocked = request.cookies.get('client_blocked')?.value === 'true'
     return NextResponse.json({ isBlocked })
   }
 }

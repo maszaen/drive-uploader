@@ -1,9 +1,11 @@
+// app/login/page.tsx
 'use client'
 
 import { ArrowUpRight, Info } from 'lucide-react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import FingerprintJS from '@fingerprintjs/fingerprintjs'
 
 const API_URL = 'https://drvsrv-891166606972.asia-southeast1.run.app'
 
@@ -23,158 +25,9 @@ export default function LoginPage() {
   )
   const [userIP, setUserIP] = useState<string>('')
   const [initialLoading, setInitialLoading] = useState<boolean>(true)
+  const [deviceFingerprint, setDeviceFingerprint] = useState<string>('unknown')
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
-
-  // Periksa status blokir pada load
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setInitialLoading(true)
-
-        // Gunakan API untuk cek blokir
-        try {
-          const blockResponse = await fetch(`${API_URL}/is-blocked`)
-          if (blockResponse.ok) {
-            const blockData = await blockResponse.json()
-            if (blockData.blocked) {
-              setIsLocked(true)
-            }
-          }
-        } catch (error) {
-          console.error('Block check failed, using fallback:', error)
-          // Fallback ke localStorage jika API gagal
-          if (localStorage.getItem('isLocked')) {
-            setIsLocked(true)
-          }
-        }
-
-        // Mendapatkan IP
-        try {
-          const ipResponse = await fetch(`${API_URL}/get-ip`)
-          if (ipResponse.ok) {
-            const ipData = await ipResponse.json()
-            setUserIP(ipData.ip)
-          }
-        } catch (error) {
-          console.error('IP check failed:', error)
-        }
-
-        // Pengecekan status disabled
-        if (localStorage.getItem('isDisabled')) {
-          setIsDisabled(true)
-        }
-
-        setTimeout(() => {
-          setInitialLoading(false)
-        }, 800)
-      } catch (error) {
-        console.error('Initial data fetch failed:', error)
-        setInitialLoading(false)
-      }
-    }
-
-    fetchInitialData()
-  }, [])
-
-  // Report login attempt ke API Anda
-  const reportFailedAttempt = async (attempts: number) => {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000)
-
-      const response = await fetch(`${API_URL}/login-attempt`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ attempts }),
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (response.status === 403) {
-        triggerLockout()
-        localStorage.setItem('isLocked', 'true')
-        return { blocked: true }
-      }
-
-      const data = await response.json()
-      return data
-    } catch (error) {
-      console.error('Failed to report attempt:', error)
-      if (attempts >= 3) {
-        triggerLockout()
-        localStorage.setItem('isLocked', 'true')
-      }
-      return null
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (isLocked) return
-
-    if (!password) {
-      setError('Password cannot be empty.')
-      return
-    }
-
-    setIsLoading(true)
-    setError('')
-
-    try {
-      const res = await signIn('credentials', {
-        redirect: false,
-        password,
-        callbackUrl: '/',
-      })
-
-      if (res?.error) {
-        const newFailedAttempts = failedAttempts + 1
-        setFailedAttempts(newFailedAttempts)
-
-        try {
-          const reportResult = await reportFailedAttempt(newFailedAttempts)
-        } catch (apiError) {
-          console.error('API report failed:', apiError)
-        }
-
-        setTimeout(() => {
-          setIsLoading(false)
-
-          if (newFailedAttempts >= 3) {
-            triggerLockout()
-            localStorage.setItem('isLocked', 'true')
-          } else {
-            setError(
-              `Incorrect password. Please try again. (${newFailedAttempts}/3 attempts)`
-            )
-          }
-        }, 1000)
-      } else if (res?.url) {
-        setTimeout(() => router.push('/'), 1000)
-      } else {
-        setTimeout(() => {
-          setError('An error occurred. Please try again.')
-          setIsLoading(false)
-        }, 1000)
-      }
-    } catch (error) {
-      setTimeout(() => {
-        setError('An error occurred. Please try again.')
-        setIsLoading(false)
-      }, 1000)
-    }
-  }
-
-  const triggerLockout = () => {
-    setError('Your IP has been blocked due to multiple failed login attempts.')
-    setIsLocked(true)
-    setRedirectCountdown(10)
-  }
 
   const handleForgotPassword = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -215,19 +68,306 @@ export default function LoginPage() {
   }
 
   useEffect(() => {
+    const generateFingerprint = async () => {
+      try {
+        const fp = await FingerprintJS.load()
+        const result = await fp.get()
+        const visitorId = result.visitorId
+
+        setDeviceFingerprint(visitorId)
+
+        document.cookie = `device_fingerprint=${visitorId}; path=/; max-age=2592000; samesite=strict${
+          window.location.protocol === 'https:' ? '; secure' : ''
+        }`
+      } catch (error) {
+        console.error('Error generating fingerprint:', error)
+      }
+    }
+
+    generateFingerprint()
+  }, [])
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        setInitialLoading(true)
+
+        let fingerprint = 'unknown'
+        try {
+          const fp = await FingerprintJS.load()
+          const result = await fp.get()
+          fingerprint = result.visitorId
+          setDeviceFingerprint(fingerprint)
+
+          document.cookie = `device_fingerprint=${fingerprint}; path=/; max-age=2592000; samesite=strict${
+            window.location.protocol === 'https:' ? '; secure' : ''
+          }`
+        } catch (fpError) {
+          console.error('Error generating fingerprint:', fpError)
+        }
+
+        // Periksa status login
+        try {
+          const statusResponse = await fetch(`${API_URL}/check-status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ fingerprint }),
+          })
+
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json()
+            console.log('Login status:', statusData)
+
+            // Set jumlah percobaan
+            if (statusData.attempts) {
+              setFailedAttempts(statusData.attempts)
+            }
+
+            // Periksa jika diblokir
+            if (statusData.blocked) {
+              setIsLocked(true)
+              localStorage.setItem('isLocked', 'true')
+              setError(
+                'Your access has been blocked due to too many failed attempts.'
+              )
+            }
+            // Periksa jika ada countdown aktif
+            else if (statusData.countdownActive && statusData.countdownUntil) {
+              const now = Date.now()
+              const timeLeft = Math.ceil(
+                (statusData.countdownUntil - now) / 1000
+              )
+
+              if (timeLeft > 0) {
+                setIsLocked(true)
+                setRedirectCountdown(timeLeft)
+
+                // Tampilkan pesan countdown berdasarkan jumlah percobaan
+                if (statusData.attempts === 3) {
+                  setError(
+                    'Too many failed attempts! Please wait before trying again.'
+                  )
+                } else if (statusData.attempts === 5) {
+                  setError(
+                    'Too many failed attempts! Please wait before trying again.'
+                  )
+                } else if (statusData.attempts === 6) {
+                  setError(
+                    'Too many failed attempts! Please wait before trying again.'
+                  )
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Status check failed:', error)
+          if (localStorage.getItem('isLocked')) {
+            setIsLocked(true)
+          }
+        }
+
+        if (localStorage.getItem('isDisabled')) {
+          setIsDisabled(true)
+        }
+
+        setTimeout(() => {
+          setInitialLoading(false)
+        }, 800)
+      } catch (error) {
+        console.error('Initial data fetch failed:', error)
+        setInitialLoading(false)
+      }
+    }
+
+    fetchInitialData()
+  }, [])
+
+  const reportFailedAttempt = async (attempts: number) => {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      const fingerprintCookie = document.cookie
+        .split('; ')
+        .find((row) => row.startsWith('device_fingerprint='))
+
+      const fingerprint = fingerprintCookie
+        ? fingerprintCookie.split('=')[1]
+        : 'unknown'
+
+      const response = await fetch(`${API_URL}/login-attempt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          attempts,
+          fingerprint,
+        }),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (response.status === 403) {
+        setIsLocked(true)
+        localStorage.setItem('isLocked', 'true')
+        return { blocked: true }
+      }
+
+      const data = await response.json()
+
+      // Jika ada countdown, mulai countdown di sisi client
+      if (data.countdownActive && data.countdownUntil) {
+        const now = Date.now()
+        const timeLeft = Math.ceil((data.countdownUntil - now) / 1000)
+
+        if (timeLeft > 0) {
+          setIsLocked(true)
+          setRedirectCountdown(timeLeft)
+        }
+      }
+
+      return data
+    } catch (error) {
+      console.error('Failed to report attempt:', error)
+      if (attempts >= 7) {
+        setIsLocked(true)
+        localStorage.setItem('isLocked', 'true')
+      }
+      return null
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (isLocked || redirectCountdown !== null) return
+
+    if (!password) {
+      setError('Password cannot be empty.')
+      return
+    }
+
+    setIsLoading(true)
+    setError('')
+
+    try {
+      const res = await signIn('credentials', {
+        redirect: false,
+        password,
+        fingerprint: deviceFingerprint,
+        callbackUrl: '/',
+      })
+
+      if (res?.error) {
+        const newFailedAttempts = failedAttempts + 1
+        setFailedAttempts(newFailedAttempts)
+
+        // Laporkan percobaan ke server
+        const reportResult = await reportFailedAttempt(newFailedAttempts)
+
+        // Periksa jika diblokir
+        if (reportResult?.blocked) {
+          setError(
+            'Your account has been permanently blocked due to too many failed attempts.'
+          )
+        }
+        // Tampilkan pesan countdown berdasarkan jumlah percobaan
+        else if (newFailedAttempts === 3) {
+          setError(
+            'Too many failed attempts! Please wait 10 seconds before trying again.'
+          )
+        } else if (newFailedAttempts === 5) {
+          setError(
+            'Too many failed attempts! Please wait 20 seconds before trying again.'
+          )
+        } else if (newFailedAttempts === 6) {
+          setError(
+            'Too many failed attempts! Please wait 25 seconds before trying again.'
+          )
+        } else if (newFailedAttempts >= 7) {
+          blockUserNow()
+          setError(
+            'Your account has been permanently blocked due to too many failed attempts.'
+          )
+        } else {
+          setError(
+            `Incorrect password. Please try again. (${newFailedAttempts}/7 attempts)`
+          )
+        }
+
+        setTimeout(() => setIsLoading(false), 1000)
+      } else if (res?.url) {
+        // Reset percobaan pada login berhasil
+        await reportFailedAttempt(0)
+        setTimeout(() => router.push('/'), 1000)
+      } else {
+        setTimeout(() => {
+          setError('An error occurred. Please try again.')
+          setIsLoading(false)
+        }, 1000)
+      }
+    } catch (error) {
+      setTimeout(() => {
+        setError('An error occurred. Please try again.')
+        setIsLoading(false)
+      }, 1000)
+    }
+  }
+
+  const blockUserNow = async () => {
+    try {
+      const fingerprintCookie = document.cookie
+        .split('; ')
+        .find((row) => row.startsWith('device_fingerprint='))
+
+      const fingerprint = fingerprintCookie
+        ? fingerprintCookie.split('=')[1]
+        : 'unknown'
+
+      const response = await fetch(`${API_URL}/block-now`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fingerprint,
+        }),
+      })
+
+      setIsLocked(true)
+      localStorage.setItem('isLocked', 'true')
+      setError('Your IP and device fingerprint have been permanently blocked.')
+
+      return response.json()
+    } catch (error) {
+      console.error('Failed to block user:', error)
+      setIsLocked(true)
+      localStorage.setItem('isLocked', 'true')
+      setError('Your access has been blocked due to security concerns.')
+      return null
+    }
+  }
+
+  // Mengelola countdown timer
+  useEffect(() => {
     let countdownInterval: NodeJS.Timeout | null = null
 
     if (redirectCountdown !== null && redirectCountdown > 0) {
       countdownInterval = setInterval(() => {
         setRedirectCountdown((prev) => {
-          if (prev !== null) {
+          if (prev !== null && prev > 1) {
             return prev - 1
+          } else {
+            // Countdown selesai
+            setIsLocked(false)
+            return null
           }
-          return null
         })
       }, 1000)
-    } else if (redirectCountdown === 0) {
-      window.location.href = 'https://www.google.com'
     }
 
     return () => {
@@ -325,7 +465,7 @@ export default function LoginPage() {
           )}
 
           <div className="flex flex-col md:flex-row">
-            <div className="mb-6 max-w-sm w-full mr-0 lg:mr-15">
+            <div className="mb-6 max-w-sm w-full mr-10 lg:mr-15">
               <img
                 src="/images/drivogle.png"
                 alt="Google Logo"
@@ -340,21 +480,32 @@ export default function LoginPage() {
               <p
                 className={`mt-1 text-sm font-normal line-h text-gray-700 pr-10`}
               >
-                {isLocked
-                  ? 'Too many failed login attempts. Please try again later.'
-                  : isDisabled
-                    ? 'You no longer have access to this website. Please leave and do not attempt to return.'
-                    : 'Enter the application password to continue. This is an independent service and not associated with Google.'}
+                {isLocked && redirectCountdown !== null
+                  ? `Login temporarily restricted. Please wait ${redirectCountdown} seconds before trying again.`
+                  : isLocked
+                    ? 'Your login attempts have exceeded the allowed limit. Your access has been blocked.'
+                    : isDisabled
+                      ? 'You no longer have access to this website. Please leave and do not attempt to return.'
+                      : 'Enter the application password to continue. This is an independent service and not associated with Google.'}
               </p>
 
               {redirectCountdown !== null && (
                 <div className="mt-4 p-4 border border-blue-200 bg-blue-50 text-blue-800 rounded-md">
-                  <p className="font-medium">
-                    Redirecting in {redirectCountdown} seconds
-                  </p>
-                  <p className="text-sm font-normal mt-1">
-                    You will be automatically redirected to Google.com
-                  </p>
+                  <div className="flex items-start">
+                    <Info className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium mb-1">
+                        Too many failed login attempts.
+                      </p>
+                      <p className="text-sm mt-2">
+                        Please wait{' '}
+                        <span className="font-bold">
+                          {redirectCountdown} seconds
+                        </span>{' '}
+                        before trying again.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -430,11 +581,13 @@ export default function LoginPage() {
                 <p
                   className={`${isLocked ? 'text-red-400' : 'text-gray-600'} `}
                 >
-                  {isLocked
-                    ? 'Your current IP address has been temporarily blocked due to multiple failed login attempts.'
-                    : isDisabled
-                      ? "You're attempting to log in? Interesting. However, this isn't for you."
-                      : 'Your current IP address will be blocked after multiple failed attempts.'}
+                  {isLocked && redirectCountdown !== null
+                    ? `Your login access is temporarily restricted for ${redirectCountdown} seconds.`
+                    : isLocked
+                      ? 'Your current IP address has been blocked due to multiple failed login attempts.'
+                      : isDisabled
+                        ? "You're attempting to log in? Interesting. However, this isn't for you."
+                        : 'Your current IP address will be blocked after multiple failed attempts.'}
                 </p>
                 <a
                   href="#"
@@ -500,6 +653,8 @@ export default function LoginPage() {
                       </svg>
                       Next
                     </div>
+                  ) : redirectCountdown !== null ? (
+                    `Wait ${redirectCountdown}s`
                   ) : isLocked ? (
                     'Locked'
                   ) : (
