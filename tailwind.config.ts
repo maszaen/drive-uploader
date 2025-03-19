@@ -4,7 +4,7 @@ const colors = require("tailwindcss/colors");
 
 const config: Config = {
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}", 
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
@@ -38,7 +38,7 @@ const config: Config = {
         bodydark1: "#DEE4EE",
         bodydark2: "#8A99AF",
         primary: "#0b57d0",
-        secondary: "#f5f8fd", 
+        secondary: "#f5f8fd",
         base: {
           ...colors.base,
           DEFAULT: "#f0f4f9",
@@ -94,11 +94,11 @@ const config: Config = {
         "title-sm": ["20px", "26px"],
         "title-sm2": ["22px", "28px"],
         "title-xsm": ["18px", "24px"],
-        "sm": ["14px", "22px"],
-        "xs": ["0.78rem", "18px"],
-        "xxs": ["0.675rem", "20px"],
-        "xxs2": ["16px", "22px"],
-        "xxs3": ["0.625rem", "20px"],
+        sm: ["14px", "22px"],
+        xs: ["0.78rem", "18px"],
+        xxs: ["0.675rem", "20px"],
+        xxs2: ["16px", "22px"],
+        xxs3: ["0.625rem", "20px"],
         "4xl": ["2.5rem", "3.5rem"],
         "5xl": ["3rem", "4rem"],
       },
@@ -268,9 +268,9 @@ const config: Config = {
         10: "10px",
         12: "12px",
       },
-      borderRadius: { 
-        'smc': '4px', 
-        'xlc': '1.25rem',
+      borderRadius: {
+        smc: "4px",
+        xlc: "1.25rem",
       },
 
       boxShadow: {

@@ -7,8 +7,9 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Drivogle - Not Google Drive",
-  description: "Not Google Drive, yet it feels familiar. A new way to store and manage your files."
-}
+  description:
+    "Not Google Drive, yet it feels familiar. A new way to store and manage your files.",
+};
 
 export default function RootLayout({
   children,
@@ -18,9 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Providers>
-        {children}
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
